@@ -1,5 +1,5 @@
 @echo off
-chcp 65001 > null
+chcp 65001 > nul
 echo ==========================================
 echo    B2B EKLENTISI OTOMATIK GUNCELLEME
 echo ==========================================

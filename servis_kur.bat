@@ -1,5 +1,4 @@
 @echo off
-chcp 65001 > nul
 setlocal enabledelayedexpansion
 
 :: Yonetici yetkisi kontrolu
@@ -38,4 +37,3 @@ if %errorLevel% equ 0 (
 )
 
 pause
-

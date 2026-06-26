@@ -1,0 +1,188 @@
+
+
+// ==================== SCRIPT #1 ====================
+(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-5XKB67M8');
+
+// ==================== SCRIPT #2 ====================
+
+
+// ==================== SCRIPT #3 ====================
+
+
+// ==================== SCRIPT #4 ====================
+
+
+// ==================== SCRIPT #5 ====================
+
+
+// ==================== SCRIPT #6 ====================
+
+
+// ==================== SCRIPT #7 ====================
+
+
+// ==================== SCRIPT #8 ====================
+const PassBtn = document.querySelector('#passBtn');
+PassBtn.addEventListener('click', () => {
+    const input = document.querySelector('#Sifre');
+    input.getAttribute('type') === 'password' ? input.setAttribute('type', 'text') : input.setAttribute('type', 'password');
+
+   if (input.getAttribute('type') === 'text'){
+     PassBtn.innerHTML = '<i class="far fa-eye"></i>';
+  } else{
+     PassBtn.innerHTML = '<i class="far fa-eye-slash"></i>';
+  }
+
+});
+
+$(document).ready(function() {
+	var savedMusteriKodu = localStorage.getItem('musteriKodu');
+	if(savedMusteriKodu) {
+		// Müşteri kodu kayıtlı: input gizle, hatırlayan başlık göster
+		$("#musteriKoduAlani").hide();
+		$("#hatirlayanBaslik").show();
+		$("#hatirlayanMusteriKod").text(savedMusteriKodu);
+		$("#KullaniciAdiHidden").val(savedMusteriKodu);
+		$("#KullaniciAdiForm").val(savedMusteriKodu);
+		$("#KullaniciKodu").focus();
+	} else {
+		$("#musteriKoduAlani").show();
+		$("#hatirlayanBaslik").hide();
+		$("#KullaniciAdi").focus();
+	}
+
+	// Beni Unut tıklanınca
+	$("#musteriDegistirBtn").on('click', function(e) {
+		e.preventDefault();
+		localStorage.removeItem('musteriKodu');
+		$("#hatirlayanBaslik").hide();
+		$("#musteriKoduAlani").show();
+		$("#KullaniciAdi").val('').focus();
+		$("#KullaniciAdiHidden").val('');
+		$("#KullaniciAdiForm").val('');
+	});
+
+	// Müşteri kodu input değişince hidden alana aktar
+	$("#KullaniciAdi").on('input change', function() {
+		$("#KullaniciAdiForm").val($(this).val());
+	});
+
+	$(document).keypress(function(event){
+	var keycode = (event.keyCode ? event.keyCode : event.which);
+		if(keycode == '13'){
+			event.preventDefault();
+			Login();
+		}
+	});
+});
+
+$( ".Sehir" ).change(function() {
+	Sehir = $(this).val();
+	$.ajax({
+	type: "GET",
+	url: "/ajax/Ilce_Secim.asp",
+	data:{Sehir:Sehir},
+	success: function(e) {
+		$(".IlceAlani").html(e);
+	},
+	error: function(e) {
+
+	}
+	});
+});
+$(".btnGonder").click(function() {
+	Login();
+});
+
+$(".btnBasvur").click(function() {
+	BayiBasvuru();
+});
+
+function Login() {
+	var btnGonder = $(".btnGonder");
+
+	// Müşteri kodunu belirle
+	var musteriKodu = $("#KullaniciAdiHidden").val() || $("#KullaniciAdi").val();
+	$("#KullaniciAdiForm").val(musteriKodu);
+
+	// İlk girişte müşteri kodunu localStorage'a kaydet
+	if(musteriKodu) {
+		localStorage.setItem('musteriKodu', musteriKodu);
+	}
+
+	btnGonder.prop('disabled',true);
+	btnGonder.html("Lütfen Bekleyiniz...");
+	
+	$.ajax({
+	type: "POST",
+	url: "/ajax/Login.asp",
+	data: $(".login-form").serialize(),
+	success: function(e) {
+	if (e==1) {
+		window.location.href = "Default.asp";
+	} else if (e==0) {
+		window.location.href = "LoginCariSecim.asp";
+	} else {
+		btnGonder.prop('disabled',false);
+		btnGonder.html("Oturum Aç");
+		Swal.fire({
+		  icon: 'error',
+		  confirmButtonText: 'Tamam',
+		  text: e
+		})
+	}
+
+	},
+	error: function(e) {
+		btnGonder.prop('disabled',false);
+		btnGonder.html("Oturum Aç");
+		Swal.fire({
+		  icon: 'error',
+		  confirmButtonText: 'Tamam',
+		  text: 'Belirlenemeyen bir hata oluştu. Lütfen sayfayı yenileyerek tekrar deneyiniz.'
+		})
+	}
+	});
+}
+function BayiBasvuru() {
+	var btnBasvur = $(".btnBasvur");
+	btnBasvur.prop('disabled',true);
+	btnBasvur.html("Lütfen Bekleyiniz...");
+	
+	$.ajax({
+	type: "POST",
+	url: "/ajax/Login_BayiBasvuru.asp",
+	data: $(".frmBayiBasvuru").serialize(),
+	success: function(e) {
+	if (e==1) {
+		Swal.fire({
+		  icon: 'success',
+		  confirmButtonText: 'Tamam',
+		  text: 'Başvurunuz gerçekleşmiştir. En kısa zamanda sizinle iletişime geçilecektir.'
+		})
+	} else {
+		btnBasvur.prop('disabled',false);
+		btnBasvur.html("Oturum Aç");
+		Swal.fire({
+		  icon: 'error',
+		  confirmButtonText: 'Tamam',
+		  text: e
+		})
+	}
+
+	},
+	error: function(e) {
+		btnBasvur.prop('disabled',false);
+		btnBasvur.html("Oturum Aç");
+		Swal.fire({
+		  icon: 'error',
+		  confirmButtonText: 'Tamam',
+		  text: 'Belirlenemeyen bir hata oluştu. Lütfen sayfayı yenileyerek tekrar deneyiniz.'
+		})
+	}
+	});
+}

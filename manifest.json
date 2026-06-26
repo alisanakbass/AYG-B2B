@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "AYG B2B",
+  "version": "1.0.0",
+  "description": "Birden fazla B2B sitesinde eşzamanlı ürün arar ve fiyatları karşılaştırarak tek bir ekranda sunar.",
+  "permissions": [
+    "storage",
+    "alarms",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "128": "logo.png"
+    }
+  },
+  "icons": {
+    "128": "logo.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://b2b.enderyapi.com.tr/*",
+        "*://*.enderyapi.com.tr/*"
+      ],
+      "js": ["content_token_main.js"],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "*://b2b.enderyapi.com.tr/*",
+        "*://*.enderyapi.com.tr/*"
+      ],
+      "js": ["content_token.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ]
+}

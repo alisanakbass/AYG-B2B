@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    :root {
+      --primary: #ef4444;
+      --primary-hover: #dc2626;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: rgba(239, 68, 68, 0.15);
+    }
+    body {
+      width: 280px;
+      margin: 0;
+      padding: 20px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #ffffff;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-sizing: border-box;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    .logo-img {
+      width: 32px;
+      height: 32px;
+      object-fit: contain;
+      filter: drop-shadow(0 2px 4px rgba(239, 68, 68, 0.15));
+    }
+    h2 {
+      font-size: 18px;
+      margin: 0;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      background: linear-gradient(to right, #0f172a, #ef4444);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    p {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+      margin: 0 0 20px 0;
+      line-height: 1.4;
+    }
+    .open-btn {
+      width: 100%;
+      padding: 10px 16px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+    .open-btn:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(239, 68, 68, 0.3);
+    }
+    .open-btn:active {
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <div class="logo-container">
+    <img src="logo.png" class="logo-img" alt="AYG B2B Logo">
+    <h2>AYG B2B</h2>
+  </div>
+  <p>Tüm B2B sitelerinde tek bir ekrandan eşzamanlı ürün arayın ve fiyatları karşılaştırın.</p>
+  <button id="open-dashboard-btn" class="open-btn">
+    <span>Portal Arayüzünü Aç</span>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+  </button>
+  <script src="popup.js"></script>
+</body>
+</html>

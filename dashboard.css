@@ -816,6 +816,11 @@ button {
   color: #10b981;
 }
 
+.source-badge.site_f {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
+
 .product-name-cell {
   font-weight: 600;
   color: var(--text);

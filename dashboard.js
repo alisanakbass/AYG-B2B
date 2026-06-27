@@ -450,8 +450,8 @@ async function checkAllSessions() {
 async function checkUpdates() {
   try {
     const CURRENT_VERSION = chrome.runtime.getManifest().version;
-    // Varsayılan update kontrol linki (Kendi GitHub/web sitenize göre güncelleyebilirsiniz)
-    const updateCheckUrl = "https://raw.githubusercontent.com/alise7/b2b_karsilastirma/main/version.json";
+    // Varsayılan update kontrol linki
+    const updateCheckUrl = "https://raw.githubusercontent.com/alisanakbass/AYG-B2B/main/version.json";
     
     const response = await fetch(updateCheckUrl, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP Hata: ${response.status}`);
@@ -495,6 +495,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadCart();
   await loadSalesHistory();
   setupUIEventListeners();
+  loadFiratStats();
   renderCart();
   renderReports();
   
@@ -607,15 +608,18 @@ async function loadSettings() {
     chrome.storage.sync.get({
       margin: 40,
       margin_site_a: 40,
+      margin_site_a: 40,
       margin_site_b: 40,
       margin_site_c: 40,
       margin_site_d: 40,
       margin_site_e: 40,
+      margin_site_f: 40,
       discount_site_a: 0,
       discount_site_b: 0,
       discount_site_c: 0,
       discount_site_d: 0,
       discount_site_e: 0,
+      discount_site_f: 0,
       url_site_a: DEFAULT_URLS.url_site_a,
       url_site_b: DEFAULT_URLS.url_site_b,
       url_site_c: DEFAULT_URLS.url_site_c,
@@ -639,14 +643,16 @@ async function loadSettings() {
         SITE_B: items.margin_site_b,
         SITE_C: items.margin_site_c,
         SITE_D: items.margin_site_d,
-        SITE_E: items.margin_site_e
+        SITE_E: items.margin_site_e,
+        SITE_F: items.margin_site_f
       };
       siteDiscounts = {
         SITE_A: items.discount_site_a,
         SITE_B: items.discount_site_b,
         SITE_C: items.discount_site_c,
         SITE_D: items.discount_site_d,
-        SITE_E: items.discount_site_e
+        SITE_E: items.discount_site_e,
+        SITE_F: items.discount_site_f
       };
       currentProductDiscounts = items.productDiscounts || {};
       keywordDiscounts = items.keywordDiscounts || [];
@@ -654,7 +660,7 @@ async function loadSettings() {
       const modalMargin = document.getElementById('modal-margin');
       if (modalMargin) modalMargin.value = items.margin;
 
-      ['a', 'b', 'c', 'd', 'e'].forEach(letter => {
+      ['a', 'b', 'c', 'd', 'e', 'f'].forEach(letter => {
         const key = `SITE_${letter.toUpperCase()}`;
         const mInput = document.getElementById(`margin-site-${letter}`);
         const dInput = document.getElementById(`discount-site-${letter}`);
@@ -743,7 +749,7 @@ function setupUIEventListeners() {
   });
 
   // Site Bazlı Kâr Marjı ve Genel İskonto Dinleyicileri
-  ['a', 'b', 'c', 'd', 'e'].forEach(letter => {
+  ['a', 'b', 'c', 'd', 'e', 'f'].forEach(letter => {
     const key = `SITE_${letter.toUpperCase()}`;
     const mInput = document.getElementById(`margin-site-${letter}`);
     const dInput = document.getElementById(`discount-site-${letter}`);
@@ -1154,6 +1160,7 @@ async function executeSearch() {
 
   // Arama sıfırlama
   currentResults = [];
+  imageFetchQueue = []; // Eski görsel arama kuyruğunu temizle
   const resultsContainer = document.getElementById('comparison-results');
   resultsContainer.innerHTML = `
     <tr>
@@ -1181,6 +1188,9 @@ async function executeSearch() {
 
   if (document.getElementById('site-e-check').checked) activeSites.push('SITE_E');
   else updateStatusIndicator('SITE_E', 'idle', 'Devre Dışı');
+
+  if (document.getElementById('site-f-check').checked) activeSites.push('SITE_F');
+  else updateStatusIndicator('SITE_F', 'idle', 'Devre Dışı');
 
   if (activeSites.length === 0) {
     resultsContainer.innerHTML = `
@@ -1212,6 +1222,10 @@ async function executeSearch() {
 // Tek Bir B2B Sitesinden Veri Çekme
 async function fetchFromB2B(siteKey, query) {
   updateStatusIndicator(siteKey, 'loading', 'Aranıyor...');
+
+  if (siteKey === 'SITE_F') {
+    return fetchFromLocalFirat(query);
+  }
   
   // Şablon URL'i al
   const storageKey = `url_${siteKey.toLowerCase()}`;
@@ -1751,6 +1765,11 @@ async function fetchFromB2B(siteKey, query) {
       });
 
       if (!apiRes.ok) throw new Error(`API Hatası: ${apiRes.status}`);
+
+      const contentType = apiRes.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error('Oturumunuz Kapanmış Olabilir. Lütfen B2B Portalına Giriş Yapın.');
+      }
 
       const list = await apiRes.json() || [];
 
@@ -2625,4 +2644,70 @@ function deleteProductDiscountRule(productKey) {
       reapplyAllDiscounts();
     });
   }
+}
+
+// --- FIRAT BORU LOCAL DATABASE METHODS ---
+
+// Fırat Boru istatistiklerini yükleyen fonksiyon
+function loadFiratStats() {
+  const list = window.firatBoruList || [];
+  const lastUpdate = window.firatLastUpdate || 'Veri Yok';
+  
+  const countEl = document.getElementById('firat-db-count');
+  const dateEl = document.getElementById('firat-db-date');
+  const statusEl = document.getElementById('site-f-status');
+  
+  if (countEl) countEl.textContent = list.length;
+  if (dateEl) dateEl.textContent = lastUpdate;
+  
+  if (statusEl) {
+    if (list.length > 0) {
+      statusEl.className = 'status-indicator success';
+      statusEl.textContent = `${list.length} Ürün`;
+    } else {
+      statusEl.className = 'status-indicator error';
+      statusEl.textContent = 'Veri Yok';
+    }
+  }
+}
+
+// Yerel Fırat Boru verilerinde arama yapan fonksiyon
+async function fetchFromLocalFirat(query) {
+  const list = window.firatBoruList || [];
+  
+  if (list.length === 0) {
+    updateStatusIndicator('SITE_F', 'error', 'Veri Yok');
+    return;
+  }
+  
+  const queryLower = query.toLowerCase();
+  const matches = list.filter(item => {
+    return item.name.toLowerCase().includes(queryLower) || item.code.toLowerCase().includes(queryLower);
+  });
+  
+  const siteKey = 'SITE_F';
+  const sourceName = 'Fırat Boru (Excel)';
+  const badgeClass = 'site_f';
+  const domain = 'firatboru_excel';
+  
+  for (const item of matches) {
+    const key = `b2b_local_firat_${item.code}`;
+    
+    // Arama sonuçlarına ekle
+    currentResults.push({
+      key,
+      name: item.name,
+      basePrice: item.price,
+      domain,
+      imgUrl: item.imgUrl || 'logo.png', // Excel'den çıkartılan grup resmi veya logo
+      sourceKey: siteKey,
+      sourceName,
+      badgeClass,
+      unit: item.unit || 'ADET',
+      packQuantity: item.packQuantity || 1,
+      itemCode: item.code
+    });
+  }
+  
+  updateStatusIndicator('SITE_F', 'success', `${matches.length} Ürün`);
 }

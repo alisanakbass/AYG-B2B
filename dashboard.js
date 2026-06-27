@@ -866,11 +866,12 @@ function setupUIEventListeners() {
         const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
         const unitPriceWithVat = rawUnitPriceWithVat * (1 - discInfo.discount / 100);
 
-        grandTotalNoVat += unitPriceNoVat * item.qty;
-        grandTotalWithVat += unitPriceWithVat * item.qty;
+        const itemPackQty = item.packQuantity || 1;
+        grandTotalNoVat += unitPriceNoVat * item.qty * itemPackQty;
+        grandTotalWithVat += unitPriceWithVat * item.qty * itemPackQty;
 
-        totalProfitNoVat += (unitPriceNoVat - purchaseNoVat) * item.qty;
-        totalProfitWithVat += (unitPriceWithVat - purchaseWithVat) * item.qty;
+        totalProfitNoVat += (unitPriceNoVat - purchaseNoVat) * item.qty * itemPackQty;
+        totalProfitWithVat += (unitPriceWithVat - purchaseWithVat) * item.qty * itemPackQty;
       });
 
       const newSale = {
@@ -2009,11 +2010,11 @@ function renderResults() {
     let purchasePricesHtml = `
       <div class="price-main">
         <span class="price-label" style="font-weight: 600;">Adet KDV'li Alış:</span>
-        <span style="font-weight: 700; color: var(--text);">${formatPrice(purchaseWithVat / packQuantity)}</span>
+        <span style="font-weight: 700; color: var(--text);">${formatPrice(purchaseWithVat)}</span>
       </div>
       <div class="price-sub" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
         <span class="price-label">Adet KDV'siz Alış:</span>
-        <span>${formatPrice(purchaseNoVat / packQuantity)}</span>
+        <span>${formatPrice(purchaseNoVat)}</span>
       </div>
     `;
 
@@ -2021,16 +2022,16 @@ function renderResults() {
     let sellingPricesHtml = `
       <div class="price-main" id="sell-price-with-vat-${product.key}">
         <span class="price-label" style="font-size: 11px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 2px;">Adet KDV'li Satış:</span>
-        <span style="font-size: 16px; font-weight: 850; color: #ffffff; background: #ef4444; padding: 4px 8px; border-radius: 6px; display: inline-block; box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3); font-family: 'Outfit', sans-serif;">${formatPrice(sellingWithVat / packQuantity)}</span>
+        <span style="font-size: 16px; font-weight: 850; color: #ffffff; background: #ef4444; padding: 4px 8px; border-radius: 6px; display: inline-block; box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3); font-family: 'Outfit', sans-serif;">${formatPrice(sellingWithVat)}</span>
       </div>
       <div class="price-sub" style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
         <span class="price-label">Adet KDV'siz Satış:</span>
-        <span id="sell-price-no-vat-${product.key}" style="font-weight: 600; color: var(--text);">${formatPrice(sellingNoVat / packQuantity)}</span>
+        <span id="sell-price-no-vat-${product.key}" style="font-weight: 600; color: var(--text);">${formatPrice(sellingNoVat)}</span>
       </div>
       <div class="profit-group" style="margin-top: 4px; border-top: 1px dashed rgba(0,0,0,0.06); padding-top: 4px;">
         <div class="profit-main" style="font-size: 11px; color: #059669; font-weight: 700;">
           <span class="profit-label">Adet Kârı:</span>
-          <span id="profit-with-vat-${product.key}">${formatPrice(profitWithVat / packQuantity)}</span>
+          <span id="profit-with-vat-${product.key}">${formatPrice(profitWithVat)}</span>
         </div>
       </div>
     `;
@@ -2133,14 +2134,14 @@ function recalculateAllResults() {
     if (sellPriceWithVatEl) {
       sellPriceWithVatEl.innerHTML = `
         <span class="price-label" style="font-size: 11px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 2px;">Adet KDV'li Satış:</span>
-        <span style="font-size: 16px; font-weight: 850; color: #ffffff; background: #ef4444; padding: 4px 8px; border-radius: 6px; display: inline-block; box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3); font-family: 'Outfit', sans-serif;">${formatPrice(sellingWithVat / packQuantity)}</span>
+        <span style="font-size: 16px; font-weight: 850; color: #ffffff; background: #ef4444; padding: 4px 8px; border-radius: 6px; display: inline-block; box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3); font-family: 'Outfit', sans-serif;">${formatPrice(sellingWithVat)}</span>
       `;
     }
     if (sellPriceNoVatEl) {
-      sellPriceNoVatEl.textContent = formatPrice(sellingNoVat / packQuantity);
+      sellPriceNoVatEl.textContent = formatPrice(sellingNoVat);
     }
     if (profitWithVatEl) {
-      profitWithVatEl.textContent = formatPrice(profitWithVat / packQuantity);
+      profitWithVatEl.textContent = formatPrice(profitWithVat);
     }
   });
 }
@@ -2231,17 +2232,18 @@ function renderCart() {
     const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
     const unitPriceWithVat = rawUnitPriceWithVat * (1 - discInfo.discount / 100);
 
-    const itemTotalNoVat = unitPriceNoVat * item.qty;
-    const itemTotalWithVat = unitPriceWithVat * item.qty;
+    const itemUnit = (item.unit || 'ADET').toUpperCase();
+    const itemPackQty = item.packQuantity || 1;
+
+    const itemTotalNoVat = unitPriceNoVat * item.qty * itemPackQty;
+    const itemTotalWithVat = unitPriceWithVat * item.qty * itemPackQty;
     
     grandTotalNoVat += itemTotalNoVat;
     grandTotalWithVat += itemTotalWithVat;
 
-    const itemProfitWithVat = (unitPriceWithVat - purchaseWithVat) * item.qty;
+    const itemProfitWithVat = (unitPriceWithVat - purchaseWithVat) * item.qty * itemPackQty;
     totalProfitWithVat += itemProfitWithVat;
 
-    const itemUnit = (item.unit || 'ADET').toUpperCase();
-    const itemPackQty = item.packQuantity || 1;
     let qtyDisplay = `${item.qty} adet`;
     if (itemUnit !== 'ADET' && itemPackQty > 1) {
       qtyDisplay = `${item.qty} ${itemUnit.toLowerCase()} (${item.qty * itemPackQty} adet)`;
@@ -2254,11 +2256,11 @@ function renderCart() {
     const div = document.createElement('div');
     div.className = 'cart-item-row';
     
-    const singleSellingWithVat = unitPriceWithVat / itemPackQty;
-    const singleSellingNoVat = unitPriceNoVat / itemPackQty;
-    const singlePurchaseWithVat = purchaseWithVat / itemPackQty;
-    const singlePurchaseNoVat = purchaseNoVat / itemPackQty;
-    const singleProfitWithVat = (unitPriceWithVat - purchaseWithVat) / itemPackQty;
+    const singleSellingWithVat = unitPriceWithVat;
+    const singleSellingNoVat = unitPriceNoVat;
+    const singlePurchaseWithVat = purchaseWithVat;
+    const singlePurchaseNoVat = purchaseNoVat;
+    const singleProfitWithVat = unitPriceWithVat - purchaseWithVat;
 
     div.innerHTML = `
       <div class="cart-item-info">
@@ -2341,17 +2343,18 @@ function confirmCart() {
     const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
     const unitPriceWithVat = rawUnitPriceWithVat * (1 - discInfo.discount / 100);
 
-    const itemTotalNoVat = unitPriceNoVat * item.qty;
-    const itemTotalWithVat = unitPriceWithVat * item.qty;
+    const itemUnit = (item.unit || 'ADET').toUpperCase();
+    const itemPackQty = item.packQuantity || 1;
+
+    const itemTotalNoVat = unitPriceNoVat * item.qty * itemPackQty;
+    const itemTotalWithVat = unitPriceWithVat * item.qty * itemPackQty;
 
     grandTotalNoVat += itemTotalNoVat;
     grandTotalWithVat += itemTotalWithVat;
 
-    const itemProfitWithVat = (unitPriceWithVat - purchaseWithVat) * item.qty;
+    const itemProfitWithVat = (unitPriceWithVat - purchaseWithVat) * item.qty * itemPackQty;
     totalProfitWithVat += itemProfitWithVat;
 
-    const itemUnit = (item.unit || 'ADET').toUpperCase();
-    const itemPackQty = item.packQuantity || 1;
     let qtyDisplay = `${item.qty}`;
     if (itemUnit !== 'ADET' && itemPackQty > 1) {
       qtyDisplay = `${item.qty} ${itemUnit.toLowerCase()} <br><span style="font-size:9px; color:var(--text-muted); font-weight:normal;">(${item.qty * itemPackQty} ad)</span>`;
@@ -2361,11 +2364,11 @@ function confirmCart() {
       qtyDisplay = `${item.qty} ${itemUnit.toLowerCase()}`;
     }
 
-    const singleSellingWithVat = unitPriceWithVat / itemPackQty;
-    const singleSellingNoVat = unitPriceNoVat / itemPackQty;
-    const singlePurchaseWithVat = purchaseWithVat / itemPackQty;
-    const singlePurchaseNoVat = purchaseNoVat / itemPackQty;
-    const singleProfitWithVat = itemProfitWithVat / (item.qty * itemPackQty);
+    const singleSellingWithVat = unitPriceWithVat;
+    const singleSellingNoVat = unitPriceNoVat;
+    const singlePurchaseWithVat = purchaseWithVat;
+    const singlePurchaseNoVat = purchaseNoVat;
+    const singleProfitWithVat = unitPriceWithVat - purchaseWithVat;
 
     const tr = document.createElement('tr');
     tr.innerHTML = `

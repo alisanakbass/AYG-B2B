@@ -8,10 +8,46 @@ const DEFAULT_URLS = {
   SITE_E: "https://bayi.akyuztools.com/Search/SearchProduct"
 };
 
-// Eklenti yüklendiğinde alarmı kur (Her 20 dakikada bir)
+// Eklenti yüklendiğinde veya güncellendiğinde alarmı kur ve kuralları ayarla
 chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create("b2b_keepalive", { periodInMinutes: 20 });
+  setupDeclarativeRules();
 });
+
+// Servis çalıştırıcı her uyandığında kuralları doğrula/tanımla
+setupDeclarativeRules();
+
+// Akyüzler için Origin ve Referer başlıklarını manipüle etme kuralları
+async function setupDeclarativeRules() {
+  const rules = [
+    {
+      id: 1,
+      priority: 1,
+      action: {
+        type: "modifyHeaders",
+        requestHeaders: [
+          { header: "origin", operation: "set", value: "https://bayi.akyuztools.com" },
+          { header: "referer", operation: "set", value: "https://bayi.akyuztools.com/" }
+        ]
+      },
+      condition: {
+        urlFilter: "||bayi.akyuztools.com/*",
+        resourceTypes: ["xmlhttprequest"]
+      }
+    }
+  ];
+
+  try {
+    // Eski kuralları temizle ve yenilerini ekle
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: [1],
+      addRules: rules
+    });
+    console.log("[B2B Background] Declarative Net Request kuralları başarıyla tanımlandı.");
+  } catch (err) {
+    console.error("[B2B Background] Kurallar tanımlanırken hata oluştu:", err);
+  }
+}
 
 // Zamanlayıcı tetiklendiğinde
 chrome.alarms.onAlarm.addListener((alarm) => {

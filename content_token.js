@@ -12,9 +12,12 @@ window.addEventListener('message', (event) => {
   const token = event.data.token;
   if (typeof token !== 'string' || token.length < 20) return;
 
-  chrome.storage.local.get('enderyapi_token', (result) => {
-    if (result.enderyapi_token !== token) {
-      chrome.storage.local.set({ enderyapi_token: token });
+  const isAkyuz = window.location.hostname.includes('akyuztools.com');
+  const storageKey = isAkyuz ? 'akyuz_token' : 'enderyapi_token';
+
+  chrome.storage.local.get(storageKey, (result) => {
+    if (result[storageKey] !== token) {
+      chrome.storage.local.set({ [storageKey]: token });
     }
   });
 });

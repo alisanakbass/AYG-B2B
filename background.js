@@ -23,7 +23,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 // Arayüzden gelen mesajları dinleme
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "manual_login") {
-    performLoginForSite(message.siteKey).then((result) => {
+    performLoginForSite(message.siteKey, true).then((result) => {
       sendResponse(result);
     });
     return true; // Asenkron yanıt göndermek için true döner
@@ -67,12 +67,26 @@ async function performBackgroundLoginForAll() {
 }
 
 // Belirli bir site için giriş işlemini gerçekleştir
-async function performLoginForSite(siteKey) {
+async function performLoginForSite(siteKey, isManual = false) {
   if (siteKey === 'SITE_E') {
-    // Akyüzler B2B sistemi masaüstü uygulaması ile giriş gerektirdiğinden otomatik giriş yapılmaz.
-    // Doğrudan başarılı dönerek eklentide "Bağlantı Hazır" (Hazır) durumunu gösteriyoruz.
-    await updateStorageSession('SITE_E', true);
-    return { success: true, message: "Masaüstü ile Açılır" };
+    // Akyüzler için eğer manuel tıklama yapıldıysa giriş sayfasını yeni sekmede açıyoruz.
+    // Arka plan otomatik tetiklemelerinde ise sadece token kontrolü yapıyoruz.
+    const storageData = await new Promise(r => chrome.storage.local.get('akyuz_token', r));
+    const hasToken = !!storageData.akyuz_token;
+
+    if (isManual && !hasToken) {
+      const loginUrl = "https://bayi.akyuztools.com/";
+      try {
+        await chrome.tabs.create({ url: loginUrl, active: true });
+        return { success: true, message: "Giriş Sayfası Açıldı" };
+      } catch (e) {
+        return { success: false, message: e.message };
+      }
+    }
+    
+    // Durumu storage'da da güncelleyelim
+    await updateStorageSession('SITE_E', hasToken);
+    return { success: hasToken, message: hasToken ? "Giriş Başarılı" : "Giriş Gerekli" };
   }
 
   let loginUrl = "";

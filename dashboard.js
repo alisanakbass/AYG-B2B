@@ -418,7 +418,7 @@ const PARSERS = {
 // Gerçek Aktif/Pasif bilgisi aramadan gelir (fetchFromB2B → updateSessionActive).
 async function checkAllSessions() {
   const storageData = await new Promise(r =>
-    chrome.storage.local.get(['enderyapi_token', 'session_SITE_A', 'session_SITE_C', 'session_SITE_D'], r)
+    chrome.storage.local.get(['enderyapi_token', 'akyuz_token', 'session_SITE_A', 'session_SITE_C', 'session_SITE_D', 'session_SITE_E'], r)
   );
 
   // SITE_A: Önceki aramada veri geldiyse Aktif, yoksa Pasif
@@ -443,6 +443,13 @@ async function checkAllSessions() {
   updateStatusIndicator('SITE_D',
     storageData.session_SITE_D ? 'success' : 'idle',
     storageData.session_SITE_D ? 'Aktif' : 'Pasif'
+  );
+
+  // SITE_E: Akyüzler token'ı varsa veya önceki aramada veri geldiyse Aktif
+  const isAkyuzActive = !!(storageData.akyuz_token || storageData.session_SITE_E);
+  updateStatusIndicator('SITE_E',
+    isAkyuzActive ? 'success' : 'idle',
+    isAkyuzActive ? 'Aktif' : 'Pasif'
   );
 }
 
@@ -1096,6 +1103,7 @@ function getSourceKeyFromDomain(domain) {
   if (domain.includes('enderyapi')) return 'SITE_B';
   if (domain.includes('yasarteknik') || domain.includes('yansis')) return 'SITE_C';
   if (domain.includes('polisankansai') || domain.includes('polisan')) return 'SITE_D';
+  if (domain.includes('akyuztools') || domain.includes('akyuz')) return 'SITE_E';
   return '';
 }
 
@@ -1735,6 +1743,9 @@ async function fetchFromB2B(siteKey, query) {
     let itemsFoundCount = 0;
 
     try {
+      const storageData = await new Promise(r => chrome.storage.local.get('akyuz_token', r));
+      const token = storageData.akyuz_token;
+
       const apiUrl = `${origin}/Search/SearchProduct`;
       const searchPayload = {
         dataCount: 0,
@@ -1755,13 +1766,18 @@ async function fetchFromB2B(siteKey, query) {
         isNewSearch: true
       };
 
+      const headers = {
+        'Content-Type': 'application/json;charset=UTF-8',
+        'Accept': 'application/json, text/plain, */*'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const apiRes = await fetch(apiUrl, {
         method: 'POST',
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json;charset=UTF-8',
-          'Accept': 'application/json, text/plain, */*'
-        },
+        headers: headers,
         body: JSON.stringify(searchPayload)
       });
 
@@ -1778,44 +1794,9 @@ async function fetchFromB2B(siteKey, query) {
         const name = item.Name || 'Bilinmeyen Ürün';
         const code = item.Code || '';
         
-        // Döviz Birimini Liste Fiyatı (PriceListStr) üzerinden tespit et
-        // PriceListStr dolar/euro ise orijinal döviz miktarını içerir, TRY ise TL fiyatını içerir
-        let currency = 'TRY';
-        const rawPriceListStr = item.PriceListStr || '';
-        if (rawPriceListStr.includes('fa-usd') || rawPriceListStr.includes('fa-dollar') || rawPriceListStr.includes('$') || rawPriceListStr.includes('USD')) {
-          currency = 'USD';
-        } else if (rawPriceListStr.includes('fa-eur') || rawPriceListStr.includes('fa-euro') || rawPriceListStr.includes('€') || rawPriceListStr.includes('EUR')) {
-          currency = 'EUR';
-        }
-
-        let rawPrice = 0;
-
-        if (currency !== 'TRY') {
-          // Dövizli ürün: PriceListStr'deki orijinal döviz miktarını al ve güncel kurla TL'ye çevir
-          // Örnek: PriceListStr = "2,750 $" → 2.75 USD × güncel USD/TL kuru
-          const dovizMiktari = parsePrice(rawPriceListStr.replace(/<[^>]*>/g, '').trim());
-          const ourRate = currency === 'USD' ? exchangeRates.USD : exchangeRates.EUR;
-          // PriceListStr liste/net fiyatıdır. PriceNetWithVatCustomerStr ile aynı iskonto oranını koru.
-          // PriceListCustomerStr = müşteri iskontolu KDVsiz fiyat (döviz)
-          // PriceNetWithVatCustomerStr = müşteri iskontolu KDV dahil fiyat (döviz cinsinden Akyüzler kuruna göre TL)
-          // Doğru yaklaşım: PriceListStr döviz miktarı × iskonto oranı (PriceListCustomer/PriceList) × güncel kur × (1 + KDV)
-          const listeMiktari = parsePrice(rawPriceListStr.replace(/<[^>]*>/g, '').trim());
-          const musteriListeMiktari = parsePrice((item.PriceListCustomerStr || '').replace(/<[^>]*>/g, '').trim());
-
-          let iskonto = 1;
-          if (listeMiktari > 0 && musteriListeMiktari > 0) {
-            // PriceListStr ve PriceListCustomerStr aynı para biriminde karşılaştır
-            iskonto = musteriListeMiktari / listeMiktari;
-          }
-
-          // KDV dahil müşteri fiyatı = döviz miktarı × iskonto × güncel kur × (1 + KDV/100)
-          const vatRate2 = typeof item.VatRate === 'number' ? item.VatRate : 20;
-          rawPrice = listeMiktari * iskonto * ourRate * (1 + vatRate2 / 100);
-        } else {
-          // TL ürün: PriceNetWithVatCustomerStr zaten KDV dahil TL fiyatıdır
-          const rawPriceStr = (item.PriceNetWithVatCustomerStr || '').replace(/<[^>]*>/g, '').trim();
-          rawPrice = parsePrice(rawPriceStr);
-        }
+        // Akyüzler nihai müşteri fiyatını KDV dahil TL olarak PriceNetWithVatCustomerStr içinde gönderir.
+        const rawPriceStr = (item.PriceNetWithVatCustomerStr || '').replace(/<[^>]*>/g, '').trim();
+        const rawPrice = parsePrice(rawPriceStr);
 
         // VatRate (Akyüzler'den gelen KDV oranı, yoksa varsayılan 20)
         const vatRate = typeof item.VatRate === 'number' ? item.VatRate : 20;

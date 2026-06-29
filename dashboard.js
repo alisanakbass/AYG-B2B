@@ -1793,17 +1793,15 @@ async function fetchFromB2B(siteKey, query) {
         throw new Error(`API Hatası: ${apiRes.status}`);
       }
 
-      const contentType = apiRes.headers.get('content-type') || '';
-      console.log("[B2B Akyüzler] Yanıt Content-Type:", contentType);
-
-      if (!contentType.includes('application/json')) {
-        const responseHtmlSample = await apiRes.text().catch(() => "");
-        console.warn("[B2B Akyüzler] Beklenen JSON yerine HTML/Farklı veri geldi (Oturum kapalı olabilir). Yanıtın ilk 500 karakteri:", responseHtmlSample.substring(0, 500));
+      const responseText = await apiRes.text();
+      let list = [];
+      try {
+        list = JSON.parse(responseText) || [];
+        console.log("[B2B Akyüzler] Gelen ürün adedi (JSON başarıyla ayrıştırıldı):", list.length);
+      } catch (jsonError) {
+        console.warn("[B2B Akyüzler] Yanıt JSON olarak ayrıştırılamadı. Oturum kapalı veya geçersiz veri olabilir. Yanıtın ilk 500 karakteri:", responseText.substring(0, 500));
         throw new Error('Oturumunuz Kapanmış Olabilir. Lütfen B2B Portalına Giriş Yapın.');
       }
-
-      const list = await apiRes.json() || [];
-      console.log("[B2B Akyüzler] Gelen ürün adedi:", list.length);
 
       list.forEach((item, index) => {
         try {

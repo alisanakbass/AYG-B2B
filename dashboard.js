@@ -1738,6 +1738,7 @@ async function fetchFromB2B(siteKey, query) {
 
   // --- AKYÜZLER (SITE_E) API ENTEGRASYONU ---
   if (siteKey === 'SITE_E') {
+    console.log("[B2B Akyüzler] Arama başlatıldı. Query:", query);
     const origin = new URL(searchUrl).origin;
     const config = PARSERS[siteKey];
     let itemsFoundCount = 0;
@@ -1745,6 +1746,7 @@ async function fetchFromB2B(siteKey, query) {
     try {
       const storageData = await new Promise(r => chrome.storage.local.get('akyuz_token', r));
       const token = storageData.akyuz_token;
+      console.log("[B2B Akyüzler] Local storage'dan okunan token:", token ? "Mevcut (uzunluk: " + token.length + ")" : "Yok");
 
       const apiUrl = `${origin}/Search/SearchProduct`;
       const searchPayload = {
@@ -1774,6 +1776,8 @@ async function fetchFromB2B(siteKey, query) {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
+      console.log("[B2B Akyüzler] Fetch isteği gönderiliyor...", { apiUrl, headers, searchPayload });
+
       const apiRes = await fetch(apiUrl, {
         method: 'POST',
         credentials: 'include',
@@ -1781,72 +1785,92 @@ async function fetchFromB2B(siteKey, query) {
         body: JSON.stringify(searchPayload)
       });
 
-      if (!apiRes.ok) throw new Error(`API Hatası: ${apiRes.status}`);
+      console.log("[B2B Akyüzler] Sunucudan yanıt geldi. Status:", apiRes.status, "OK:", apiRes.ok);
+
+      if (!apiRes.ok) {
+        const errText = await apiRes.text().catch(() => "");
+        console.error("[B2B Akyüzler] Sunucu hata yanıtı içeriği:", errText);
+        throw new Error(`API Hatası: ${apiRes.status}`);
+      }
 
       const contentType = apiRes.headers.get('content-type') || '';
+      console.log("[B2B Akyüzler] Yanıt Content-Type:", contentType);
+
       if (!contentType.includes('application/json')) {
+        const responseHtmlSample = await apiRes.text().catch(() => "");
+        console.warn("[B2B Akyüzler] Beklenen JSON yerine HTML/Farklı veri geldi (Oturum kapalı olabilir). Yanıtın ilk 500 karakteri:", responseHtmlSample.substring(0, 500));
         throw new Error('Oturumunuz Kapanmış Olabilir. Lütfen B2B Portalına Giriş Yapın.');
       }
 
       const list = await apiRes.json() || [];
+      console.log("[B2B Akyüzler] Gelen ürün adedi:", list.length);
 
-      list.forEach(item => {
-        const name = item.Name || 'Bilinmeyen Ürün';
-        const code = item.Code || '';
-        
-        // Akyüzler nihai müşteri fiyatını KDV dahil TL olarak PriceNetWithVatCustomerStr içinde gönderir.
-        const rawPriceStr = (item.PriceNetWithVatCustomerStr || '').replace(/<[^>]*>/g, '').trim();
-        const rawPrice = parsePrice(rawPriceStr);
+      list.forEach((item, index) => {
+        try {
+          const name = item.Name || 'Bilinmeyen Ürün';
+          const code = item.Code || '';
+          
+          // Akyüzler nihai müşteri fiyatını KDV dahil TL olarak PriceNetWithVatCustomerStr içinde gönderir.
+          const rawPriceStr = (item.PriceNetWithVatCustomerStr || '').replace(/<[^>]*>/g, '').trim();
+          const rawPrice = parsePrice(rawPriceStr);
 
-        // VatRate (Akyüzler'den gelen KDV oranı, yoksa varsayılan 20)
-        const vatRate = typeof item.VatRate === 'number' ? item.VatRate : 20;
+          // VatRate (Akyüzler'den gelen KDV oranı, yoksa varsayılan 20)
+          const vatRate = typeof item.VatRate === 'number' ? item.VatRate : 20;
 
-        // KDV'siz net alış fiyatı
-        const basePrice = rawPrice / (1 + vatRate / 100);
+          // KDV'siz net alış fiyatı
+          const basePrice = rawPrice / (1 + vatRate / 100);
 
-        const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
-        const key = `b2b_${domain.replace(/\./g, '_')}_${item.Id || code || cleanName}`;
-
-        let imgUrl = item.PicturePath || '';
-        if (imgUrl && !imgUrl.startsWith('http')) {
-          if (imgUrl.includes('nophoto.png')) {
-            imgUrl = '';
-          } else {
-            imgUrl = imgUrl.startsWith('/') ? `${origin}${imgUrl}` : `${origin}/${imgUrl}`;
+          if (index < 3) {
+            console.log(`[B2B Akyüzler] Örnek Ürün #${index + 1}:`, { name, code, rawPriceStr, rawPrice, basePrice });
           }
-        }
 
-        // Birim tespiti
-        let unit = (item.Unit || 'ADET').trim().toUpperCase();
-        if (unit.includes('PAKET') || unit.includes('KOLİ') || unit.includes('KUTU')) {
-          unit = unit.includes('PAKET') ? 'PAKET' : (unit.includes('KOLİ') ? 'KOLİ' : 'KUTU');
-        } else {
-          unit = 'ADET';
-        }
+          const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
+          const key = `b2b_${domain.replace(/\./g, '_')}_${item.Id || code || cleanName}`;
 
-        // Paket içi adet
-        let packQuantity = parsePackQuantityFromName(name);
-        if (!packQuantity) {
-          packQuantity = typeof item.QuantityInPackage === 'number' ? item.QuantityInPackage : 1;
-        }
+          let imgUrl = item.PicturePath || '';
+          if (imgUrl && !imgUrl.startsWith('http')) {
+            if (imgUrl.includes('nophoto.png')) {
+              imgUrl = '';
+            } else {
+              imgUrl = imgUrl.startsWith('/') ? `${origin}${imgUrl}` : `${origin}/${imgUrl}`;
+            }
+          }
 
-        if (!isNaN(basePrice) && basePrice > 0) {
-          currentResults.push({
-            key,
-            name,
-            basePrice,
-            domain,
-            imgUrl,
-            sourceKey: siteKey,
-            sourceName: config.name,
-            badgeClass: config.badgeClass,
-            unit,
-            packQuantity
-          });
-          itemsFoundCount++;
+          // Birim tespiti
+          let unit = (item.Unit || 'ADET').trim().toUpperCase();
+          if (unit.includes('PAKET') || unit.includes('KOLİ') || unit.includes('KUTU')) {
+            unit = unit.includes('PAKET') ? 'PAKET' : (unit.includes('KOLİ') ? 'KOLİ' : 'KUTU');
+          } else {
+            unit = 'ADET';
+          }
+
+          // Paket içi adet
+          let packQuantity = parsePackQuantityFromName(name);
+          if (!packQuantity) {
+            packQuantity = typeof item.QuantityInPackage === 'number' ? item.QuantityInPackage : 1;
+          }
+
+          if (!isNaN(basePrice) && basePrice > 0) {
+            currentResults.push({
+              key,
+              name,
+              basePrice,
+              domain,
+              imgUrl,
+              sourceKey: siteKey,
+              sourceName: config.name,
+              badgeClass: config.badgeClass,
+              unit,
+              packQuantity
+            });
+            itemsFoundCount++;
+          }
+        } catch (err) {
+          console.error(`[B2B Akyüzler] Satır işleme hatası (İndeks: ${index}):`, err);
         }
       });
 
+      console.log("[B2B Akyüzler] Başarıyla sonuçlara eklenen ürün adedi:", itemsFoundCount);
       updateStatusIndicator(siteKey, 'success', `${itemsFoundCount} Ürün`);
       if (itemsFoundCount > 0) updateSessionActive(siteKey);
       return;

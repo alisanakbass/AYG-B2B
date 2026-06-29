@@ -10,7 +10,8 @@ const DEFAULT_URLS = {
 
 // Eklenti yüklendiğinde veya güncellendiğinde alarmı kur ve kuralları ayarla
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.alarms.create("b2b_keepalive", { periodInMinutes: 20 });
+  // Sadece Yaşar Teknik oturumunu 15 dakikada bir yenilemek için alarmı ayarla
+  chrome.alarms.create("b2b_keepalive", { periodInMinutes: 15 });
   setupDeclarativeRules();
 });
 
@@ -51,8 +52,9 @@ async function setupDeclarativeRules() {
 
 // Zamanlayıcı tetiklendiğinde
 chrome.alarms.onAlarm.addListener((alarm) => {
+  // Bu alarm artık sadece Yaşar Teknik oturumunu canlı tutmak için kullanılıyor.
   if (alarm.name === "b2b_keepalive") {
-    performBackgroundLoginForAll();
+    performLoginForSite('SITE_C');
   }
 });
 
@@ -119,7 +121,7 @@ async function performLoginForSite(siteKey, isManual = false) {
         return { success: false, message: e.message };
       }
     }
-    
+
     // Durumu storage'da da güncelleyelim
     await updateStorageSession('SITE_E', hasToken);
     return { success: hasToken, message: hasToken ? "Giriş Başarılı" : "Giriş Gerekli" };
@@ -166,19 +168,19 @@ async function performLoginForSite(siteKey, isManual = false) {
   try {
     // Sekmeyi arka planda aç (active: false)
     tab = await chrome.tabs.create({ url: loginUrl, active: false });
-    
+
     // Sayfanın yüklenmesini bekle (en fazla 15 saniye)
     await waitForTabComplete(tab.id);
-    
+
     // Giriş betiğini enjekte et ve çalıştır
     const loginResult = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: autoLoginScriptInPage,
       args: [siteKey, creds]
     });
-    
+
     const res = loginResult[0]?.result || { success: false, reason: "Bilinmeyen betik hatası" };
-    
+
     if (res.success) {
       if (res.alreadyLoggedIn) {
         await updateStorageSession(siteKey, true);
@@ -187,7 +189,7 @@ async function performLoginForSite(siteKey, isManual = false) {
       } else {
         // Giriş butonuna tıklandıysa, yönlendirme ve giriş yapılması için 4 saniye bekle
         await new Promise(r => setTimeout(r, 4000));
-        
+
         // Girişin başarılı olup olmadığını doğrulamak için tekrar kontrol et
         const verifyResult = await chrome.scripting.executeScript({
           target: { tabId: tab.id },
@@ -196,10 +198,10 @@ async function performLoginForSite(siteKey, isManual = false) {
             return { loggedIn: !hasPassword };
           }
         });
-        
+
         const loggedIn = verifyResult[0]?.result?.loggedIn || false;
         await updateStorageSession(siteKey, loggedIn);
-        
+
         chrome.tabs.remove(tab.id);
         return { success: loggedIn, message: loggedIn ? "Giriş Başarılı" : "Şifre/Giriş Hatası veya Doldurma Yapılamadı" };
       }
@@ -211,7 +213,7 @@ async function performLoginForSite(siteKey, isManual = false) {
   } catch (error) {
     console.error(`[B2B Background] ${siteKey} giriş akışı sırasında hata oluştu:`, error);
     if (tab && tab.id) {
-      try { chrome.tabs.remove(tab.id); } catch(e) {}
+      try { chrome.tabs.remove(tab.id); } catch (e) { }
     }
     await updateStorageSession(siteKey, false);
     return { success: false, message: `Bağlantı Hatası: ${error.message}` };
@@ -228,7 +230,7 @@ function waitForTabComplete(tabId) {
       }
     };
     chrome.tabs.onUpdated.addListener(listener);
-    
+
     // Güvenlik zaman aşımı (15 saniye)
     setTimeout(() => {
       chrome.tabs.onUpdated.removeListener(listener);
@@ -256,7 +258,7 @@ function autoLoginScriptInPage(siteKey, creds) {
     // Sayfanın yüklenmesi ve betiklerin oturması için 1.5 saniye bekle
     setTimeout(() => {
       const passwordInput = document.querySelector('input[type="password"]');
-      
+
       // 1. Şifre alanı yoksa, zaten oturum açılmış veya dashboard ekranındayız demektir.
       if (!passwordInput) {
         resolve({ success: true, alreadyLoggedIn: true });
@@ -298,7 +300,7 @@ function autoLoginScriptInPage(siteKey, creds) {
         // Yaşar Teknik özel input ID'leri
         usernameInput = document.getElementById('KullaniciKodu');
         const companyInput = document.getElementById('KullaniciAdiForm') || document.getElementById('KullaniciAdi');
-        
+
         if (companyInput && companyCode) {
           companyInput.value = companyCode;
           companyInput.dispatchEvent(new Event('input', { bubbles: true }));

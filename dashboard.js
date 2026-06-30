@@ -140,18 +140,18 @@ function calculateSellingPrice(basePrice, margin, includeVat) {
 function extractImageUrl(row, selector, domain) {
   const imgEl = selector ? row.querySelector(selector) : row.querySelector('img');
   if (!imgEl) return '';
-  
-  let src = imgEl.getAttribute('data-src') || 
-            imgEl.getAttribute('data-original') || 
-            imgEl.getAttribute('src') || 
-            imgEl.getAttribute('ng-src') || '';
-            
+
+  let src = imgEl.getAttribute('data-src') ||
+    imgEl.getAttribute('data-original') ||
+    imgEl.getAttribute('src') ||
+    imgEl.getAttribute('ng-src') || '';
+
   src = src.trim();
   if (!src) return '';
-  
+
   // Base64 doğrudan geçerlidir
   if (src.startsWith('data:')) return src;
-  
+
   if (!src.startsWith('http')) {
     if (src.startsWith('//')) {
       src = 'https:' + src;
@@ -201,7 +201,7 @@ const PARSERS = {
             const span = li.querySelector('span');
             const priceText = span ? span.textContent : li.textContent.replace('KDV Hariç:', '');
             basePrice = parsePrice(priceText);
-            
+
             // Döviz Birimi Çevrimi
             let currency = 'TRY';
             if (priceText.includes('$') || priceText.includes('USD') || priceText.includes('fa-usd') || priceText.includes('fa-dollar')) {
@@ -209,7 +209,7 @@ const PARSERS = {
             } else if (priceText.includes('€') || priceText.includes('EUR') || priceText.includes('fa-eur') || priceText.includes('fa-euro')) {
               currency = 'EUR';
             }
-            
+
             if (currency === 'USD') {
               basePrice = basePrice * exchangeRates.USD;
             } else if (currency === 'EUR') {
@@ -230,7 +230,7 @@ const PARSERS = {
       }
       const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
       const key = `b2b_${domain.replace(/\./g, '_')}_${modelId || cleanName}`;
-      
+
       // Görsel Ayıklama
       const imgUrl = extractImageUrl(row, 'img', domain);
 
@@ -251,18 +251,18 @@ const PARSERS = {
       if (priceEl) {
         const clone = priceEl.cloneNode(true);
         const priceText = priceEl.innerHTML;
-        
+
         let currency = 'TRY';
         if (priceText.includes('fa-usd') || priceText.includes('fa-dollar') || priceText.includes('$') || priceText.includes('USD')) {
           currency = 'USD';
         } else if (priceText.includes('fa-eur') || priceText.includes('fa-euro') || priceText.includes('€') || priceText.includes('EUR')) {
           currency = 'EUR';
         }
-        
+
         const iTag = clone.querySelector('i');
         if (iTag) iTag.remove();
         basePrice = parsePrice(clone.textContent);
-        
+
         if (currency === 'USD') {
           basePrice = basePrice * exchangeRates.USD;
         } else if (currency === 'EUR') {
@@ -274,7 +274,7 @@ const PARSERS = {
       const codeId = codeEl ? codeEl.textContent.trim().replace(/\s+/g, '_') : '';
       const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
       const key = `b2b_${domain.replace(/\./g, '_')}_${codeId || cleanName}`;
-      
+
       // Görsel Ayıklama
       const imgUrl = extractImageUrl(row, '.img-id img, img', domain);
 
@@ -282,16 +282,16 @@ const PARSERS = {
       const unitEl = row.querySelector('.unit-id, .measure-unit, [data-title="Birim"], [data-title="Birim"] span');
       let unit = unitEl ? unitEl.textContent.trim().toUpperCase() : 'ADET';
       if (unit.includes('PAKET') || unit.includes('KOLİ') || unit.includes('KUTU') || unit.includes('DZ') || unit.includes('DÜZİNE') || unit.includes('SET') || unit.includes('TAKIM')) {
-        unit = (unit.includes('DZ') || unit.includes('DÜZİNE')) ? 'DÜZİNE' : 
-               (unit.includes('KOLİ') ? 'KOLİ' : 
-               (unit.includes('KUTU') ? 'KUTU' : 'PAKET'));
+        unit = (unit.includes('DZ') || unit.includes('DÜZİNE')) ? 'DÜZİNE' :
+          (unit.includes('KOLİ') ? 'KOLİ' :
+            (unit.includes('KUTU') ? 'KUTU' : 'PAKET'));
       } else {
         unit = 'ADET';
       }
 
       // Önce ürün adından paket miktarını çözmeyi deneyelim (Ender Yapı tutarsızlıkları için öncelikli)
       let packQuantity = parsePackQuantityFromName(name);
-      
+
       if (!packQuantity) {
         const boxQtyEl = row.querySelector('[data-title="Kutu / Koli"], [data-title="Kutu / Koli"] span, .fieldone-id, .fieldone-id span, .multiplier-id, .order-multiplier, [data-title="Çarpan"]');
         packQuantity = 1;
@@ -324,14 +324,14 @@ const PARSERS = {
       if (tds.length >= 5) {
         const priceText = tds[4].textContent;
         basePrice = parsePrice(priceText);
-        
+
         let currency = 'TRY';
         if (priceText.includes('$') || priceText.includes('USD') || priceText.includes('fa-usd') || priceText.includes('fa-dollar')) {
           currency = 'USD';
         } else if (priceText.includes('€') || priceText.includes('EUR') || priceText.includes('fa-eur') || priceText.includes('fa-euro')) {
           currency = 'EUR';
         }
-        
+
         if (currency === 'USD') {
           basePrice = basePrice * exchangeRates.USD;
         } else if (currency === 'EUR') {
@@ -342,7 +342,7 @@ const PARSERS = {
       const codeId = row.id || '';
       const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
       const key = `b2b_${domain.replace(/\./g, '_')}_${codeId || cleanName}`;
-      
+
       // Görsel Ayıklama
       const imgUrl = extractImageUrl(row, 'td img, img', domain);
 
@@ -368,14 +368,14 @@ const PARSERS = {
       if (priceEl) {
         const priceText = priceEl.textContent;
         basePrice = parsePrice(priceText);
-        
+
         let currency = 'TRY';
         if (priceText.includes('$') || priceText.includes('USD') || priceText.includes('fa-usd') || priceText.includes('fa-dollar')) {
           currency = 'USD';
         } else if (priceText.includes('€') || priceText.includes('EUR') || priceText.includes('fa-eur') || priceText.includes('fa-euro')) {
           currency = 'EUR';
         }
-        
+
         if (currency === 'USD') {
           basePrice = basePrice * exchangeRates.USD;
         } else if (currency === 'EUR') {
@@ -385,7 +385,7 @@ const PARSERS = {
 
       const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
       const key = `b2b_${domain.replace(/\./g, '_')}_${codeId || cleanName}`;
-      
+
       // Görsel Ayıklama
       const imgUrl = extractImageUrl(row, 'img[data-bind*="pictureUrl"], img', domain);
 
@@ -395,7 +395,7 @@ const PARSERS = {
 
       // Önce ürün adından paket miktarını çözmeyi çalışalım
       let packQuantity = parsePackQuantityFromName(name);
-      
+
       if (!packQuantity) {
         const boxQtyEl = row.querySelector('[data-bind*="boxQty"], [data-bind*="boxQuantity"], [data-bind*="multiplier"]');
         packQuantity = 1;
@@ -459,10 +459,10 @@ async function checkUpdates() {
     const CURRENT_VERSION = chrome.runtime.getManifest().version;
     // Varsayılan update kontrol linki
     const updateCheckUrl = "https://raw.githubusercontent.com/alisanakbass/AYG-B2B/main/version.json";
-    
+
     const response = await fetch(updateCheckUrl, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP Hata: ${response.status}`);
-    
+
     const data = await response.json();
     if (data && data.version) {
       if (compareVersions(CURRENT_VERSION, data.version) < 0) {
@@ -502,10 +502,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadCart();
   await loadSalesHistory();
   setupUIEventListeners();
+  await loadDefaultExcelIfEmpty();
   loadFiratStats();
   renderCart();
   renderReports();
-  
+
   // Oturum durumlarını kontrol et
   checkAllSessions();
 
@@ -582,7 +583,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }, true); // capturing event listener
   }
-  
+
   // Storage değişikliklerini izle
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'sync') {
@@ -663,7 +664,7 @@ async function loadSettings() {
       };
       currentProductDiscounts = items.productDiscounts || {};
       keywordDiscounts = items.keywordDiscounts || [];
-      
+
       const modalMargin = document.getElementById('modal-margin');
       if (modalMargin) modalMargin.value = items.margin;
 
@@ -674,7 +675,7 @@ async function loadSettings() {
         if (mInput) mInput.value = siteMargins[key];
         if (dInput) dInput.value = siteDiscounts[key];
       });
-      
+
       const modalUrlA = document.getElementById('modal-url-site-a');
       const modalUrlB = document.getElementById('modal-url-site-b');
       const modalUrlC = document.getElementById('modal-url-site-c');
@@ -696,7 +697,7 @@ async function loadSettings() {
       const cPassC = document.getElementById('cred-pass-site-c');
       const cUserD = document.getElementById('cred-user-site-d');
       const cPassD = document.getElementById('cred-pass-site-d');
-      
+
       if (cUserA) cUserA.value = items.cred_user_site_a || "info@aygunleryapi.com";
       if (cPassA) cPassA.value = items.cred_pass_site_a || "FZ0DT1YL*0OE";
       if (cUserB) cUserB.value = items.cred_user_site_b || "120 08 1401";
@@ -709,7 +710,7 @@ async function loadSettings() {
 
       renderKeywordDiscountRules();
       renderProductDiscountRules();
-      
+
       resolve();
     });
   });
@@ -740,7 +741,7 @@ function setupUIEventListeners() {
   // Arama Tetikleyicileri
   const searchInput = document.getElementById('search-input');
   const searchBtn = document.getElementById('search-btn');
-  
+
   searchBtn.addEventListener('click', executeSearch);
   searchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') executeSearch();
@@ -834,11 +835,11 @@ function setupUIEventListeners() {
   const closeConfirmModalBtn = document.getElementById('close-confirm-modal-btn');
   const confirmModalCancelBtn = document.getElementById('confirm-modal-cancel-btn');
   const confirmModal = document.getElementById('cart-confirm-modal');
-  
+
   const closeConfirmModal = () => {
     if (confirmModal) confirmModal.classList.remove('open');
   };
-  
+
   if (closeConfirmModalBtn) closeConfirmModalBtn.addEventListener('click', closeConfirmModal);
   if (confirmModalCancelBtn) confirmModalCancelBtn.addEventListener('click', closeConfirmModal);
   if (confirmModal) {
@@ -869,7 +870,7 @@ function setupUIEventListeners() {
         const margin = siteMargins[sourceKey] !== undefined ? siteMargins[sourceKey] : currentMargin;
         const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false);
         const rawUnitPriceWithVat = calculateSellingPrice(item.basePrice, margin, true);
-        
+
         const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
         const unitPriceWithVat = rawUnitPriceWithVat * (1 - discInfo.discount / 100);
 
@@ -908,7 +909,7 @@ function setupUIEventListeners() {
   const navSettingsBtn = document.getElementById('nav-settings-btn');
   const pageSearch = document.getElementById('page-search');
   const pageSettings = document.getElementById('page-settings');
-  
+
   if (navSearchBtn && navSettingsBtn && pageSearch && pageSettings) {
     navSearchBtn.addEventListener('click', () => {
       navSearchBtn.classList.add('active');
@@ -916,7 +917,7 @@ function setupUIEventListeners() {
       pageSearch.classList.add('active');
       pageSettings.classList.remove('active');
     });
-    
+
     navSettingsBtn.addEventListener('click', () => {
       navSettingsBtn.classList.add('active');
       navSearchBtn.classList.remove('active');
@@ -949,13 +950,13 @@ function setupUIEventListeners() {
         alert("Lütfen 0 ile 100 arasında geçerli bir iskonto oranı girin.");
         return;
       }
-      
+
       const selectedChecks = document.querySelectorAll('.select-product-check:checked');
       if (selectedChecks.length === 0) {
         alert("Lütfen iskonto uygulamak istediğiniz ürünleri seçin.");
         return;
       }
-      
+
       selectedChecks.forEach(cb => {
         const key = cb.getAttribute('data-key');
         const product = currentResults.find(p => p.key === key);
@@ -967,7 +968,7 @@ function setupUIEventListeners() {
           };
         }
       });
-      
+
       chrome.storage.sync.set({ productDiscounts: currentProductDiscounts }, () => {
         alert("Seçilen ürünlere kalıcı özel iskonto başarıyla uygulandı!");
         document.getElementById('bulk-discount-val').value = '';
@@ -1047,14 +1048,14 @@ function setupUIEventListeners() {
       e.preventDefault();
       e.stopPropagation();
       const siteKey = btn.getAttribute('data-site');
-      
+
       // Butonu yükleniyor durumuna getir
       btn.classList.add('connecting');
       const btnText = btn.querySelector('span');
       if (btnText) btnText.textContent = "Bağlanıyor...";
-      
+
       updateStatusIndicator(siteKey, 'loading', 'Bağlanıyor...');
-      
+
       // Arka plana giriş talebi gönder
       chrome.runtime.sendMessage({ action: "manual_login", siteKey: siteKey }, (response) => {
         // Butonu eski haline getir
@@ -1124,7 +1125,7 @@ function calculateTotalDiscountForProduct(name, productKey, sourceKey) {
       type: 'Özel'
     };
   }
-  
+
   // 2. Kelime bazlı kalıcı iskonto
   let kwDiscount = 0;
   let matchedKeyword = '';
@@ -1136,14 +1137,14 @@ function calculateTotalDiscountForProduct(name, productKey, sourceKey) {
       }
     }
   });
-  
+
   if (kwDiscount > 0) {
     return {
       discount: kwDiscount,
       type: `Kural (${matchedKeyword})`
     };
   }
-  
+
   // 3. Siteye özel genel iskonto (Fallback)
   const baseSiteDiscount = siteDiscounts[sourceKey] || 0;
   if (baseSiteDiscount > 0) {
@@ -1152,7 +1153,7 @@ function calculateTotalDiscountForProduct(name, productKey, sourceKey) {
       type: 'Site Geneli'
     };
   }
-  
+
   return {
     discount: 0,
     type: ''
@@ -1235,12 +1236,12 @@ async function fetchFromB2B(siteKey, query) {
   if (siteKey === 'SITE_F') {
     return fetchFromLocalFirat(query);
   }
-  
+
   // Şablon URL'i al
   const storageKey = `url_${siteKey.toLowerCase()}`;
   const settings = await new Promise(r => chrome.storage.sync.get(storageKey, r));
   const urlTemplate = settings[storageKey] || DEFAULT_URLS[storageKey];
-  
+
   const searchUrl = urlTemplate.replace('{query}', encodeURIComponent(query));
   const domain = new URL(searchUrl).hostname;
 
@@ -1280,7 +1281,7 @@ async function fetchFromB2B(siteKey, query) {
         try {
           const name = jsonRow.c || 'Bilinmeyen Ürün';
           const code = jsonRow.b || jsonRow.b0 || '';
-          
+
           let basePrice = NaN;
           if (jsonRow.j) {
             basePrice = parsePrice(jsonRow.j.toString());
@@ -1289,23 +1290,23 @@ async function fetchFromB2B(siteKey, query) {
           } else if (jsonRow.g) {
             basePrice = parsePrice(jsonRow.g.toString());
           }
-          
+
           const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
           const key = `b2b_${domain.replace(/\./g, '_')}_${jsonRow.a || cleanName}`;
-          
+
           let imgUrl = '';
           if (jsonRow.o && jsonRow.o.length > 0) {
             const val = jsonRow.o[0];
             const imgPath = val.a || '';
             const imgType = val.b;
-            
+
             let baseUrl = 'https://d1y8qveuwztoxr.cloudfront.net/b2b_ozkaradeniz/'; // varsayılan (b == 1)
             if (imgType == 3) {
               baseUrl = 'https://b4b.ozkaradenizinsaat.com/upload/ext_image/';
             } else if (imgType == 2) {
               baseUrl = 'https://d1y8qveuwztoxr.cloudfront.net/_NAT/';
             }
-            
+
             imgUrl = `${baseUrl}${imgPath}`;
           }
 
@@ -1435,7 +1436,7 @@ async function fetchFromB2B(siteKey, query) {
 
           // Fiyat ayrıştırma
           let rawPrice = 0;
-          
+
           // 1. ProductPrices içindeki fiyatları tara
           if (jsonRow.ProductPrices) {
             if (Array.isArray(jsonRow.ProductPrices)) {
@@ -1451,11 +1452,11 @@ async function fetchFromB2B(siteKey, query) {
               rawPrice = jsonRow.ProductPrices.Price || jsonRow.ProductPrices.NetPrice || jsonRow.ProductPrices.PriceWithOrWithoutTax || 0;
             }
           }
-          
+
           // 2. Doğrudan veya details altındaki fiyatları tara (Fallback)
           if (!rawPrice) {
             rawPrice = jsonRow.DiscountPrice || jsonRow.NetPrice || jsonRow.Price || jsonRow.B2BPrice ||
-                       details.DiscountPrice || details.NetPrice || details.Price || details.B2BPrice || 0;
+              details.DiscountPrice || details.NetPrice || details.Price || details.B2BPrice || 0;
           }
 
           let basePrice = typeof rawPrice === 'number' ? rawPrice : parsePrice(rawPrice.toString());
@@ -1506,16 +1507,16 @@ async function fetchFromB2B(siteKey, query) {
           }
 
           if (unit.includes('PAKET') || unit.includes('KOLİ') || unit.includes('KUTU') || unit.includes('DZ') || unit.includes('DÜZİNE') || unit.includes('SET') || unit.includes('TAKIM')) {
-            unit = (unit.includes('DZ') || unit.includes('DÜZİNE')) ? 'DÜZİNE' : 
-                   (unit.includes('KOLİ') ? 'KOLİ' : 
-                   (unit.includes('KUTU') ? 'KUTU' : 'PAKET'));
+            unit = (unit.includes('DZ') || unit.includes('DÜZİNE')) ? 'DÜZİNE' :
+              (unit.includes('KOLİ') ? 'KOLİ' :
+                (unit.includes('KUTU') ? 'KUTU' : 'PAKET'));
           } else {
             unit = 'ADET';
           }
 
           // Paket İçi Adet Tespiti (Zenginleştirilmiş)
           let packQuantity = parsePackQuantityFromName(name);
-          
+
           if (!packQuantity) {
             const possibleMultipliers = [
               details.Field1,
@@ -1596,20 +1597,103 @@ async function fetchFromB2B(siteKey, query) {
     let itemsFoundCount = 0;
 
     try {
-      const homeRes = await fetch(`${origin}/Home/Index`, { credentials: 'include' });
-      if (!homeRes.ok) throw new Error("Ana sayfa yüklenemedi");
-      
-      const homeHtml = await homeRes.text();
-      const tokenRegex = /mbis\.requestVerificationToken\s*=\s*["']([^"']+)["']/i;
-      const tokenMatch = homeHtml.match(tokenRegex);
-      
-      if (!tokenMatch) {
-        throw new Error("mbis.requestVerificationToken bulunamadı, HTML Fallback moduna geçiliyor");
+      // 1. Yerel hafızadan (cache) son başarılı kampanya kodunu yükle
+      let activeCampaignCode = '';
+      const storedData = await chrome.storage.local.get('polisanCampaignCode');
+      if (storedData && storedData.polisanCampaignCode) {
+        activeCampaignCode = storedData.polisanCampaignCode;
       }
-      
-      const verificationToken = tokenMatch[1];
 
+      // 2. Açık olan Polisan sekmesini bulup içinden canlı verileri (token ve kampanya kodu) alıyoruz
+      const allTabs = await new Promise((resolve) => {
+        chrome.tabs.query({}, resolve);
+      });
+      const polisanTabs = allTabs.filter(t => t.url && t.url.includes('polisankansai.com'));
+
+      let verificationToken = '';
+
+      if (polisanTabs.length > 0) {
+        const targetTab = polisanTabs[0];
+        
+        const results = await chrome.scripting.executeScript({
+          target: { tabId: targetTab.id },
+          world: "MAIN",
+          func: () => {
+            let token = '';
+            let campaign = '';
+
+            try {
+              // Token bul
+              if (typeof mbis !== 'undefined' && mbis.requestVerificationToken) {
+                token = mbis.requestVerificationToken;
+              }
+              if (!token) {
+                const input = document.querySelector('input[name="__RequestVerificationToken"]');
+                if (input) token = input.value;
+              }
+
+              // Kampanya kodunu bul (Tüm HTML'i tara)
+              const htmlContent = document.documentElement.innerHTML;
+              const kMatches = htmlContent.match(/\b(K\d{7})\b/g);
+              if (kMatches && kMatches.length > 0) {
+                campaign = kMatches[0];
+              }
+
+              // Knockout modelini kontrol et
+              if (!campaign && typeof ko !== 'undefined') {
+                const bindEl = document.querySelector('[data-bind*="campaign"]') || document.querySelector('[data-bind]');
+                if (bindEl) {
+                  const vm = ko.dataFor(bindEl);
+                  if (vm) {
+                    if (vm.campaignCode) campaign = ko.unwrap(vm.campaignCode);
+                    else if (vm.activeCampaignCode) campaign = ko.unwrap(vm.activeCampaignCode);
+                  }
+                }
+              }
+            } catch (err) {
+              // Hata durumunda sessizce yoksay
+            }
+
+            return { token, campaign };
+          }
+        });
+
+        const res = results[0]?.result;
+        if (res) {
+          verificationToken = res.token;
+          if (res.campaign) {
+            activeCampaignCode = res.campaign;
+            // Yeni bulunan kampanya kodunu hafızaya kaydet
+            chrome.storage.local.set({ polisanCampaignCode: activeCampaignCode });
+          }
+        }
+      }
+
+      // 3. Eğer açık sekme yoksa veya veriler alınamadıysa, arka planda fetch ile almayı dene (Fallback)
+      if (!verificationToken) {
+        const pageRes = await fetch(`${origin}/order/makeordernew`, { credentials: 'include' });
+        if (pageRes.ok) {
+          const pageHtml = await pageRes.text();
+          const tokenMatch = pageHtml.match(/mbis\.requestVerificationToken\s*=\s*["']([^"']+)["']/i);
+          if (tokenMatch) verificationToken = tokenMatch[1];
+          
+          // Eğer hafızada da kod yoksa, html'den bulmaya çalış
+          if (!activeCampaignCode) {
+            const kMatch = pageHtml.match(/\b(K\d{7})\b/) || pageHtml.match(/value=["'](K\d{7})["']/i);
+            if (kMatch) {
+              activeCampaignCode = kMatch[1];
+              chrome.storage.local.set({ polisanCampaignCode: activeCampaignCode });
+            }
+          }
+        }
+      }
+
+      if (!verificationToken) throw new Error("Verification token bulunamadı (Oturum kapalı olabilir)");
+
+      // 4. İsteği DOĞRUDAN PANELDEN (Sekme Açmadan) gönderiyoruz
       const apiUrl = `${origin}/api/Orders/SearchProductElastic`;
+
+      // Kullanıcının belirttiği gibi payload yapısını kuruyoruz
       const searchPayload = {
         options: [],
         categoryCode: 0,
@@ -1617,7 +1701,7 @@ async function fetchFromB2B(siteKey, query) {
         hasStock: false,
         size: 100,
         pageIndex: 0,
-        campaignCode: ''
+        campaignCode: activeCampaignCode
       };
 
       const apiRes = await fetch(apiUrl, {
@@ -1640,16 +1724,15 @@ async function fetchFromB2B(siteKey, query) {
         const name = item.name || 'Bilinmeyen Ürün';
         const sku = item.sku || '';
         const basePrice = typeof item.price === 'number' ? item.price : parsePrice(item.price ? item.price.toString() : '');
-        
+
         const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
         const key = `b2b_${domain.replace(/\./g, '_')}_${sku || cleanName}`;
-        
+
         let imgUrl = item.pictureUrl || '';
         if (imgUrl && !imgUrl.startsWith('http')) {
           imgUrl = imgUrl.startsWith('/') ? `${origin}${imgUrl}` : `${origin}/${imgUrl}`;
         }
 
-        // Birim ve Paket İçi Adet Tespiti
         let unit = (item.unit || item.unitName || item.measurementUnit || 'ADET').trim().toUpperCase();
         if (unit.includes('PAKET') || unit.includes('KOLİ') || unit.includes('KUTU')) {
           unit = unit.includes('PAKET') ? 'PAKET' : (unit.includes('KOLİ') ? 'KOLİ' : 'KUTU');
@@ -1693,7 +1776,7 @@ async function fetchFromB2B(siteKey, query) {
       return;
 
     } catch (apiError) {
-      // API başarısız, HTML Fallback moduna geçiliyor
+      console.error(`[B2B Polisan] API Hatası nedeniyle HTML Fallback moduna geçiliyor:`, apiError);
     }
 
     // --- FALLBACK HTML PARSER YÖNTEMİ ---
@@ -1807,7 +1890,7 @@ async function fetchFromB2B(siteKey, query) {
         try {
           const name = item.Name || 'Bilinmeyen Ürün';
           const code = item.Code || '';
-          
+
           // Akyüzler nihai müşteri fiyatını KDV dahil TL olarak PriceNetWithVatCustomerStr içinde gönderir.
           const rawPriceStr = (item.PriceNetWithVatCustomerStr || '').replace(/<[^>]*>/g, '').trim();
           const rawPrice = parsePrice(rawPriceStr);
@@ -1890,7 +1973,7 @@ async function fetchFromB2B(siteKey, query) {
     });
 
     if (!response.ok) throw new Error(`HTTP Hata: ${response.status}`);
-    
+
     const htmlText = await response.text();
 
     const parser = new DOMParser();
@@ -1955,7 +2038,7 @@ function updateSessionActive(siteKey) {
 // Sonuçları Ekrana Çizme
 function renderResults() {
   const container = document.getElementById('comparison-results');
-  
+
   if (currentResults.length === 0) {
     container.innerHTML = `
       <tr>
@@ -1986,22 +2069,22 @@ function renderResults() {
     const margin = siteMargins[product.sourceKey] !== undefined ? siteMargins[product.sourceKey] : currentMargin;
     const rawSellingNoVat = calculateSellingPrice(product.basePrice, margin, false);
     const rawSellingWithVat = calculateSellingPrice(product.basePrice, margin, true);
-    
+
     const sellingNoVat = rawSellingNoVat * (1 - discInfo.discount / 100);
     const sellingWithVat = rawSellingWithVat * (1 - discInfo.discount / 100);
 
     // Net Kâr
     const profitWithVat = sellingWithVat - purchaseWithVat;
 
-    const discBadgeHtml = discInfo.discount > 0 ? 
+    const discBadgeHtml = discInfo.discount > 0 ?
       `<div class="discount-badge-value">%${discInfo.discount}</div>
-       <div class="discount-badge-type">${escapeHtml(discInfo.type)}</div>` : 
+       <div class="discount-badge-type">${escapeHtml(discInfo.type)}</div>` :
       `<span style="color: var(--text-muted);">-</span>`;
 
     // Birim ve Paket Kırılımları
     const unit = (product.unit || 'ADET').toUpperCase();
     const packQuantity = product.packQuantity || 1;
-    
+
     let unitBadgeHtml = '';
     if (packQuantity > 1) {
       unitBadgeHtml = `<span class="unit-badge-result" style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: rgba(59, 130, 246, 0.1); color: #3b82f6; font-weight: 600; display: inline-block; margin-top: 4px;">${unit} (Pkt: ${packQuantity})</span>`;
@@ -2052,11 +2135,11 @@ function renderResults() {
       <td>
         <div class="product-cell-main">
           <div class="product-img-wrapper">
-            ${product.imgUrl ? 
-              `<img src="${product.imgUrl}" class="product-img">
-               <div class="product-img-placeholder" style="display:none;">📦</div>` : 
-              `<div class="product-img-placeholder">📦</div>`
-            }
+            ${product.imgUrl ?
+        `<img src="${product.imgUrl}" class="product-img">
+               <div class="product-img-placeholder" style="display:none;">📦</div>` :
+        `<div class="product-img-placeholder">📦</div>`
+      }
           </div>
           <div class="product-info-wrapper">
             <div class="product-name-cell">${escapeHtml(product.name)}</div>
@@ -2103,7 +2186,7 @@ function renderResults() {
 
     container.appendChild(tr);
   });
-  
+
   // Seçim çubuğunu sıfırla/güncelle
   updateBulkDiscountBarVisibility();
 }
@@ -2121,7 +2204,7 @@ function recalculateAllResults() {
     const margin = siteMargins[product.sourceKey] !== undefined ? siteMargins[product.sourceKey] : currentMargin;
     const rawSellingNoVat = calculateSellingPrice(product.basePrice, margin, false);
     const rawSellingWithVat = calculateSellingPrice(product.basePrice, margin, true);
-    
+
     const sellingNoVat = rawSellingNoVat * (1 - discInfo.discount / 100);
     const sellingWithVat = rawSellingWithVat * (1 - discInfo.discount / 100);
 
@@ -2163,7 +2246,7 @@ function applySorting() {
   } else if (criteria === 'source') {
     currentResults.sort((a, b) => a.sourceName.localeCompare(b.sourceName, 'tr'));
   }
-  
+
   renderResults();
 }
 
@@ -2202,7 +2285,7 @@ function addToSharedCart(product, addedQty, buttonEl) {
 function renderCart() {
   const container = document.getElementById('sidebar-cart-items');
   const items = Object.values(currentCart);
-  
+
   // Miktar sayacı
   const totalItemsCount = items.reduce((sum, item) => sum + item.qty, 0);
   document.getElementById('cart-count').textContent = totalItemsCount;
@@ -2231,7 +2314,7 @@ function renderCart() {
     const margin = siteMargins[sourceKey] !== undefined ? siteMargins[sourceKey] : currentMargin;
     const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false);
     const rawUnitPriceWithVat = calculateSellingPrice(item.basePrice, margin, true);
-    
+
     const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
     const unitPriceWithVat = rawUnitPriceWithVat * (1 - discInfo.discount / 100);
 
@@ -2240,7 +2323,7 @@ function renderCart() {
 
     const itemTotalNoVat = unitPriceNoVat * item.qty * itemPackQty;
     const itemTotalWithVat = unitPriceWithVat * item.qty * itemPackQty;
-    
+
     grandTotalNoVat += itemTotalNoVat;
     grandTotalWithVat += itemTotalWithVat;
 
@@ -2258,7 +2341,7 @@ function renderCart() {
 
     const div = document.createElement('div');
     div.className = 'cart-item-row';
-    
+
     const singleSellingWithVat = unitPriceWithVat;
     const singleSellingNoVat = unitPriceNoVat;
     const singlePurchaseWithVat = purchaseWithVat;
@@ -2327,7 +2410,7 @@ function confirmCart() {
   if (!tbody) return;
 
   tbody.innerHTML = '';
-  
+
   let grandTotalNoVat = 0;
   let grandTotalWithVat = 0;
   let totalProfitWithVat = 0;
@@ -2342,7 +2425,7 @@ function confirmCart() {
     const margin = siteMargins[sourceKey] !== undefined ? siteMargins[sourceKey] : currentMargin;
     const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false);
     const rawUnitPriceWithVat = calculateSellingPrice(item.basePrice, margin, true);
-    
+
     const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
     const unitPriceWithVat = rawUnitPriceWithVat * (1 - discInfo.discount / 100);
 
@@ -2424,10 +2507,10 @@ function renderReports() {
   if (!salesHistoryRows) return;
 
   const now = new Date();
-  
+
   // Bugünün başlangıcı (Gece yarısı 00:00)
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  
+
   // Bu ayın başlangıcı (Ayın 1'i Gece yarısı 00:00)
   const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 
@@ -2592,7 +2675,7 @@ function updateBulkDiscountBarVisibility() {
   const selectedCount = document.querySelectorAll('.select-product-check:checked').length;
   const bulkBar = document.getElementById('bulk-discount-container');
   const countEl = document.getElementById('bulk-selected-count');
-  
+
   if (bulkBar && countEl) {
     if (selectedCount > 0) {
       countEl.textContent = `${selectedCount} ürün seçildi`;
@@ -2655,65 +2738,311 @@ function deleteProductDiscountRule(productKey) {
 // --- FIRAT BORU LOCAL DATABASE METHODS ---
 
 // Fırat Boru istatistiklerini yükleyen fonksiyon
-function loadFiratStats() {
-  const list = window.firatBoruList || [];
-  const lastUpdate = window.firatLastUpdate || 'Veri Yok';
-  
-  const countEl = document.getElementById('firat-db-count');
-  const dateEl = document.getElementById('firat-db-date');
-  const statusEl = document.getElementById('site-f-status');
-  
-  if (countEl) countEl.textContent = list.length;
-  if (dateEl) dateEl.textContent = lastUpdate;
-  
-  if (statusEl) {
-    if (list.length > 0) {
-      statusEl.className = 'status-indicator success';
-      statusEl.textContent = `${list.length} Ürün`;
-    } else {
-      statusEl.className = 'status-indicator error';
-      statusEl.textContent = 'Veri Yok';
+async function loadFiratStats() {
+  chrome.storage.local.get(['firatBoruList', 'firatLastUpdate'], (res) => {
+    const list = res.firatBoruList || [];
+    const lastUpdate = res.firatLastUpdate || 'Veri Yok';
+
+    const countEl = document.getElementById('firat-db-count');
+    const dateEl = document.getElementById('firat-db-date');
+    const statusEl = document.getElementById('site-f-status');
+
+    if (countEl) countEl.textContent = list.length;
+    if (dateEl) dateEl.textContent = lastUpdate;
+
+    if (statusEl) {
+      if (list.length > 0) {
+        statusEl.className = 'status-indicator success';
+        statusEl.textContent = `${list.length} Ürün`;
+      } else {
+        statusEl.className = 'status-indicator error';
+        statusEl.textContent = 'Veri Yok';
+      }
     }
-  }
+  });
 }
 
 // Yerel Fırat Boru verilerinde arama yapan fonksiyon
 async function fetchFromLocalFirat(query) {
-  const list = window.firatBoruList || [];
-  
-  if (list.length === 0) {
-    updateStatusIndicator('SITE_F', 'error', 'Veri Yok');
-    return;
-  }
-  
-  const queryLower = query.toLowerCase();
-  const matches = list.filter(item => {
-    return item.name.toLowerCase().includes(queryLower) || item.code.toLowerCase().includes(queryLower);
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['firatBoruList'], (res) => {
+      const list = res.firatBoruList || [];
+
+      if (list.length === 0) {
+        updateStatusIndicator('SITE_F', 'error', 'Veri Yok');
+        resolve();
+        return;
+      }
+
+      const queryLower = query.toLowerCase();
+      const matches = list.filter(item => {
+        const nameMatch = item.name && item.name.toLowerCase().includes(queryLower);
+        const codeMatch = item.code && item.code.toLowerCase().includes(queryLower);
+        return nameMatch || codeMatch;
+      });
+
+      const siteKey = 'SITE_F';
+      const sourceName = 'Fırat Boru';
+      const badgeClass = 'site_f';
+      const domain = 'firatboru_excel';
+
+      for (const item of matches) {
+        const key = `b2b_local_firat_${item.code}`;
+
+        // Arama sonuçlarına ekle
+        currentResults.push({
+          key,
+          name: item.name,
+          basePrice: item.price,
+          domain,
+          imgUrl: item.imgUrl || 'logo.png',
+          sourceKey: siteKey,
+          sourceName,
+          badgeClass,
+          unit: item.unit || 'ADET',
+          packQuantity: item.packQuantity || 1,
+          itemCode: item.code
+        });
+      }
+
+      updateStatusIndicator('SITE_F', 'success', `${matches.length} Ürün`);
+      resolve();
+    });
   });
-  
-  const siteKey = 'SITE_F';
-  const sourceName = 'Fırat Boru (Excel)';
-  const badgeClass = 'site_f';
-  const domain = 'firatboru_excel';
-  
-  for (const item of matches) {
-    const key = `b2b_local_firat_${item.code}`;
-    
-    // Arama sonuçlarına ekle
-    currentResults.push({
-      key,
-      name: item.name,
-      basePrice: item.price,
-      domain,
-      imgUrl: item.imgUrl || 'logo.png', // Excel'den çıkartılan grup resmi veya logo
-      sourceKey: siteKey,
-      sourceName,
-      badgeClass,
-      unit: item.unit || 'ADET',
-      packQuantity: item.packQuantity || 1,
-      itemCode: item.code
+}
+
+// --- EXCEL FILE UPLOADER FOR FIRAT BORU ---
+document.addEventListener('DOMContentLoaded', () => {
+  const excelInput = document.getElementById('firat-excel-input');
+  const uploadBtn = document.getElementById('upload-excel-btn');
+  const uploadStatus = document.getElementById('excel-upload-status');
+
+  if (uploadBtn && excelInput) {
+    uploadBtn.addEventListener('click', () => {
+      excelInput.click();
     });
   }
-  
-  updateStatusIndicator('SITE_F', 'success', `${matches.length} Ürün`);
+
+  if (excelInput) {
+    excelInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (uploadStatus) {
+        uploadStatus.style.display = 'block';
+        uploadStatus.style.background = 'rgba(59, 130, 246, 0.1)';
+        uploadStatus.style.color = '#3b82f6';
+        uploadStatus.textContent = 'Dosya okunuyor, lütfen bekleyin...';
+      }
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+
+          // İlk sayfayı al
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+
+          // Sayfayı JSON'a dönüştür
+          const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          const parsedProducts = [];
+          
+          // Veriler 5. satırdan başlıyor (indeks 4)
+          for (let i = 4; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row || row.length < 6) continue;
+
+            // B sütunu: Mamul Kodu (index 1)
+            // C sütunu: Ambalaj Türü (index 2)
+            // D sütunu: Mamul Adı (index 3)
+            // E sütunu: Birim (index 4)
+            // F sütunu: Birim Fiyatı (index 5)
+            const code = row[1] ? row[1].toString().trim() : '';
+            const packaging = row[2] ? row[2].toString().trim() : '';
+            const name = row[3] ? row[3].toString().trim() : '';
+            const unitRaw = row[4] ? row[4].toString().trim() : 'Ad.';
+            const priceRaw = row[5];
+
+            // Kod veya isim yoksa boş satırdır, atla
+            if (!code || !name) continue;
+
+            // Fiyatı sayıya dönüştür
+            let price = 0;
+            if (typeof priceRaw === 'number') {
+              price = priceRaw;
+            } else if (priceRaw) {
+              price = parsePrice(priceRaw.toString());
+            }
+
+            // Birim ve paket içi miktar tespiti
+            let unit = 'ADET';
+            let packQuantity = 1;
+
+            if (unitRaw) {
+              const uUpper = unitRaw.toUpperCase();
+              if (uUpper.includes('PAKET') || uUpper.includes('PK') || uUpper.includes('BAG') || uUpper.includes('BAĞ')) {
+                unit = 'PAKET';
+              } else if (uUpper.includes('KOLİ') || uUpper.includes('KOLI')) {
+                unit = 'KOLİ';
+              } else if (uUpper.includes('KUTU')) {
+                unit = 'KUTU';
+              }
+            }
+
+            // Ambalaj türünden paket miktarını bulmaya çalış (Örn: "100 Çuval", "20 Bağ", "1 Adet")
+            if (packaging) {
+              const qtyMatch = packaging.match(/^(\d+)/);
+              if (qtyMatch) {
+                packQuantity = parseInt(qtyMatch[1], 10);
+              }
+            }
+
+            parsedProducts.push({
+              code,
+              name: `${name} (${packaging || 'Adet'})`,
+              price,
+              unit,
+              packQuantity,
+              imgUrl: 'logo.png' // Varsayılan resim
+            });
+          }
+
+          if (parsedProducts.length === 0) {
+            throw new Error("Excel dosyasından geçerli bir ürün okunamadı. Lütfen formatı kontrol edin.");
+          }
+
+          // Tarih bilgisi oluştur
+          const dateStr = new Date().toLocaleString('tr-TR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+
+          // chrome.storage.local'e kaydet
+          chrome.storage.local.set({
+            firatBoruList: parsedProducts,
+            firatLastUpdate: dateStr
+          }, () => {
+            if (uploadStatus) {
+              uploadStatus.style.background = 'rgba(16, 185, 129, 0.1)';
+              uploadStatus.style.color = '#10b981';
+              uploadStatus.textContent = `Başarılı! ${parsedProducts.length} ürün yüklendi.`;
+            }
+            loadFiratStats();
+            alert(`Excel veritabanı başarıyla güncellendi!\nToplam ${parsedProducts.length} ürün sisteme yüklendi.`);
+          });
+
+        } catch (err) {
+          console.error('[B2B Excel] Yükleme hatası:', err);
+          if (uploadStatus) {
+            uploadStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+            uploadStatus.style.color = '#ef4444';
+            uploadStatus.textContent = `Hata: ${err.message}`;
+          }
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
+    });
+  }
+});
+
+// Eklenti dizinindeki varsayılan Excel dosyasını otomatik yükleyen fonksiyon
+async function loadDefaultExcelIfEmpty() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['firatBoruList'], async (res) => {
+      if (res.firatBoruList && res.firatBoruList.length > 0) {
+        // Zaten veri var, hiçbir şey yapma
+        resolve();
+        return;
+      }
+
+      console.log("[B2B Fırat] Yerel veritabanı boş, varsayılan Excel yükleniyor...");
+      try {
+        const fileUrl = chrome.runtime.getURL("ADANA 20 HAZİRAN 2026 BORU FİYAT LİSTESİ.xlsx");
+        const response = await fetch(fileUrl);
+        if (!response.ok) throw new Error(`Varsayılan Excel dosyası yüklenemedi: ${response.status}`);
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const data = new Uint8Array(arrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        const parsedProducts = [];
+
+        // Veriler 5. satırdan başlıyor (indeks 4)
+        for (let i = 4; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || row.length < 6) continue;
+
+          const code = row[1] ? row[1].toString().trim() : '';
+          const packaging = row[2] ? row[2].toString().trim() : '';
+          const name = row[3] ? row[3].toString().trim() : '';
+          const unitRaw = row[4] ? row[4].toString().trim() : 'Ad.';
+          const priceRaw = row[5];
+
+          if (!code || !name) continue;
+
+          let price = 0;
+          if (typeof priceRaw === 'number') {
+            price = priceRaw;
+          } else if (priceRaw) {
+            price = parsePrice(priceRaw.toString());
+          }
+
+          let unit = 'ADET';
+          let packQuantity = 1;
+
+          if (unitRaw) {
+            const uUpper = unitRaw.toUpperCase();
+            if (uUpper.includes('PAKET') || uUpper.includes('PK') || uUpper.includes('BAG') || uUpper.includes('BAĞ')) {
+              unit = 'PAKET';
+            } else if (uUpper.includes('KOLİ') || uUpper.includes('KOLI')) {
+              unit = 'KOLİ';
+            } else if (uUpper.includes('KUTU')) {
+              unit = 'KUTU';
+            }
+          }
+
+          if (packaging) {
+            const qtyMatch = packaging.match(/^(\d+)/);
+            if (qtyMatch) {
+              packQuantity = parseInt(qtyMatch[1], 10);
+            }
+          }
+
+          parsedProducts.push({
+            code,
+            name: `${name} (${packaging || 'Adet'})`,
+            price,
+            unit,
+            packQuantity,
+            imgUrl: 'logo.png'
+          });
+        }
+
+        if (parsedProducts.length > 0) {
+          chrome.storage.local.set({
+            firatBoruList: parsedProducts,
+            firatLastUpdate: "20 HAZİRAN 2026 (Varsayılan)"
+          }, () => {
+            console.log(`[B2B Fırat] Varsayılan Excel başarıyla yüklendi: ${parsedProducts.length} ürün.`);
+            resolve();
+          });
+        } else {
+          resolve();
+        }
+      } catch (err) {
+        console.error("[B2B Fırat] Varsayılan Excel yükleme hatası:", err);
+        resolve();
+      }
+    });
+  });
 }

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="dashboard.css">
-  <script src="firat_boru_database.js"></script>
+  <script src="xlsx.full.min.js"></script>
 </head>
 <body>
   <div id="update-notification" style="display: none; background: linear-gradient(135deg, #d97706, #b45309); color: white; padding: 10px 20px; font-size: 13px; text-align: center; position: relative; z-index: 9999; font-weight: 500; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); border-bottom: 2px solid rgba(0,0,0,0.1);">
@@ -490,6 +490,7 @@
                 </table>
               </div>
               <button id="clear-history-btn" class="danger-btn" style="margin-top: 12px; width: 100%; padding: 10px; font-size: 12px;">Geçmişi Tamamen Temizle</button>
+            </div>
           </div>
 
           <!-- Fırat Boru Excel Sekmesi -->
@@ -498,13 +499,22 @@
             <div class="settings-group" style="display: flex; flex-direction: column; gap: 15px; padding: 20px; background: rgba(239, 68, 68, 0.02); border: 1px solid rgba(239, 68, 68, 0.15); border-radius: 8px;">
               <div style="font-size: 13.5px; line-height: 1.6; color: var(--text);">
                 <p style="margin-bottom: 12px; font-weight: 600; color: #f87171; font-size: 14px;">📊 Fırat Boru Excel Fiyat Listesi Güncelleme Rehberi</p>
-                <p style="margin-bottom: 10px;">Excel listesinden fiyatları, kodları ve ürün resimlerini otomatik ayrıştırıp sisteme bağlamak için şu adımları uygulayın:</p>
-                <ol style="margin-left: 20px; display: flex; flex-direction: column; gap: 8px;">
-                  <li>Size ait olan en güncel <b><code style="background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-weight: 600;">firatboru_fiyat_listesi.xlsx</code></b> dosyasını eklenti klasörünün içerisine kopyalayın.</li>
-                  <li>Klasördeki <b><code style="background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-weight: 600; color: #60a5fa;">guncelle_excel.bat</code></b> dosyasına çift tıklayarak çalıştırın.</li>
-                  <li>Dönüştürücü betik otomatik olarak Excel'i arşivden çıkartıp görsellerini tek tek kırpacak ve her ürün koduyla eşleştirip <b>`images/`</b> klasörüne kaydedecektir.</li>
-                  <li>Excel aktarımı bittikten sonra bu sayfayı yenileyin.</li>
-                </ol>
+                <p style="margin-bottom: 10px;">Excel listesinden fiyatları, kodları ve ürün bilgilerini tarayıcı üzerinden doğrudan yükleyip karşılaştırma portalına bağlayabilirsiniz.</p>
+                <p style="margin-bottom: 10px; font-size: 12.5px; color: var(--text-muted);">
+                  <b>Excel formatı gereksinimleri:</b> Veriler 5. satırdan başlamalıdır. B sütunu mamul kodu, C sütunu ambalaj türü, D sütunu mamul adı, E sütunu birim ve F sütunu birim fiyatını (KDV hariç) içermelidir.
+                </p>
+              </div>
+
+              <!-- Excel Yükleme Alanı -->
+              <div class="excel-upload-zone" style="margin-top: 5px; padding: 25px; border: 2px dashed rgba(239, 68, 68, 0.3); border-radius: 8px; text-align: center; background: rgba(239, 68, 68, 0.01); transition: all 0.3s ease;">
+                <div style="font-size: 28px; margin-bottom: 10px;">📥</div>
+                <p style="margin-bottom: 15px; font-size: 13px; color: var(--text-muted);">Fırat Boru Excel dosyasını seçin (.xlsx, .xls)</p>
+                <input type="file" id="firat-excel-input" accept=".xlsx, .xls" style="display: none;">
+                <button type="button" id="upload-excel-btn" class="primary-btn" style="margin: 0 auto; display: inline-flex; align-items: center; gap: 8px; background: #ef4444; border-color: #ef4444;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                  <span>Excel Dosyası Seç</span>
+                </button>
+                <div id="excel-upload-status" style="margin-top: 15px; font-size: 12px; font-weight: 500; display: none; padding: 8px 12px; border-radius: 6px; width: fit-content; margin-left: auto; margin-right: auto;"></div>
               </div>
 
               <div class="info-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--text-muted); background: var(--bg-input); padding: 12px 16px; border-radius: 8px; margin-top: 10px; border: 1px solid var(--border);">

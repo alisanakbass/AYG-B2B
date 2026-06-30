@@ -536,6 +536,24 @@ function setupUIEventListeners() {
       });
     });
   }
+
+  // Çekmeceleri (Collapsible) Açma/Kapama İşlemi
+  const collapsibleHeaders = document.querySelectorAll('.collapsible-header');
+  collapsibleHeaders.forEach(header => {
+    header.addEventListener('click', () => {
+      // Tıklanan başlığın hemen altındaki içeriği bul
+      const content = header.nextElementSibling;
+      // Başlığın içindeki ok (chevron) ikonunu bul
+      const chevron = header.querySelector('.chevron');
+
+      if (content) {
+        content.classList.toggle('open');
+      }
+      if (chevron) {
+        chevron.classList.toggle('open');
+      }
+    });
+  });
 }
 
 // --- INITIALIZE ---

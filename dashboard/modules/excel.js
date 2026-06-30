@@ -56,7 +56,9 @@ export async function fetchFromLocalFirat(query) {
 
         const typeName = getProductTypeName(item.name);
         const safeFilename = getSafeFilename(typeName);
-        const finalImg = safeFilename ? `images/${safeFilename}.jpeg` : '../logo.png';
+        // Görselleri yerel dizin yerine doğrudan CDN üzerinden çekiyoruz
+        const IMAGE_BASE_URL = 'https://cdn.jsdelivr.net/gh/alisanakbass/AYG-B2B@main/';
+        const finalImg = safeFilename ? `${IMAGE_BASE_URL}images/${safeFilename}.jpeg` : '../logo.png';
 
         state.currentResults.push({
           key,

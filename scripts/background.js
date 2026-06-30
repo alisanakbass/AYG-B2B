@@ -52,7 +52,7 @@ async function setupDeclarativeRules() {
 
 // Arayüzün (dashboard.html) açık olup olmadığını kontrol eden yardımcı
 async function isDashboardOpen() {
-  const tabs = await chrome.tabs.query({ url: chrome.runtime.getURL("dashboard.html") });
+  const tabs = await chrome.tabs.query({ url: chrome.runtime.getURL("dashboard/dashboard.html") });
   return tabs.length > 0;
 }
 

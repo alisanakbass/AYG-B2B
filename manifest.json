@@ -15,10 +15,10 @@
     "https://*/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "scripts/background.js"
   },
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "popup/popup.html",
     "default_icon": {
       "128": "logo.png"
     }
@@ -34,7 +34,7 @@
         "*://bayi.akyuztools.com/*",
         "*://*.akyuztools.com/*"
       ],
-      "js": ["content_token_main.js"],
+      "js": ["scripts/content_token_main.js"],
       "run_at": "document_start",
       "world": "MAIN",
       "all_frames": true
@@ -46,7 +46,7 @@
         "*://bayi.akyuztools.com/*",
         "*://*.akyuztools.com/*"
       ],
-      "js": ["content_token.js"],
+      "js": ["scripts/content_token.js"],
       "run_at": "document_start",
       "all_frames": true
     }

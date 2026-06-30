@@ -19,6 +19,9 @@ if %errorlevel% equ 10 (
             for /d %%i in (temp_update\*) do (
                 xcopy "%%i\*" ".\" /s /e /y > nul
             )
+            :: Eski gereksiz kok dosyalarini temizle (Klasör yapısı güncellendiği için)
+            del /f /q popup.html popup.js dashboard.html dashboard.js dashboard.css content_token.js content_token_main.js yasar_check.js download_missing_images.js 2>nul
+
             :: Temizlik
             rd /s /q temp_update
             del update.zip

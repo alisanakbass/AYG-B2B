@@ -10,8 +10,8 @@ const DEFAULT_URLS = {
 
 // Eklenti yüklendiğinde veya güncellendiğinde alarmı kur ve kuralları ayarla
 chrome.runtime.onInstalled.addListener(() => {
-  // Sadece Yaşar Teknik oturumunu 15 dakikada bir yenilemek için alarmı ayarla
-  chrome.alarms.create("b2b_keepalive", { periodInMinutes: 15 });
+  // Sadece Yaşar Teknik oturumunu 10 dakikada bir yenilemek için alarmı ayarla
+  chrome.alarms.create("b2b_keepalive", { periodInMinutes: 10 });
   setupDeclarativeRules();
 });
 
@@ -50,11 +50,20 @@ async function setupDeclarativeRules() {
   }
 }
 
+// Arayüzün (dashboard.html) açık olup olmadığını kontrol eden yardımcı
+async function isDashboardOpen() {
+  const tabs = await chrome.tabs.query({ url: chrome.runtime.getURL("dashboard.html") });
+  return tabs.length > 0;
+}
+
 // Zamanlayıcı tetiklendiğinde
-chrome.alarms.onAlarm.addListener((alarm) => {
+chrome.alarms.onAlarm.addListener(async (alarm) => {
   // Bu alarm artık sadece Yaşar Teknik oturumunu canlı tutmak için kullanılıyor.
   if (alarm.name === "b2b_keepalive") {
-    performLoginForSite('SITE_C');
+    const open = await isDashboardOpen();
+    if (open) {
+      performLoginForSite('SITE_C');
+    }
   }
 });
 

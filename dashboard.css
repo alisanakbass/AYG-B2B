@@ -103,6 +103,7 @@ body {
   letter-spacing: -0.5px;
   background: linear-gradient(to right, #0f172a, #ef4444);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -436,7 +437,7 @@ input:checked + .slider:before {
 }
 
 .sidebar-cart-list {
-  max-height: 180px;
+  max-height: 280px;
   overflow-y: auto;
   margin-bottom: 14px;
   display: flex;
@@ -1388,15 +1389,15 @@ button {
 .menu-btn {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   background: transparent;
   border: 1px solid transparent;
-  color: var(--text-muted);
-  padding: 10px 14px;
-  border-radius: 8px;
+  color: var(--text);
+  padding: 12px 16px;
+  border-radius: 10px;
   font-family: var(--font);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14.5px;
+  font-weight: 650;
   cursor: pointer;
   text-align: left;
   transition: var(--transition);
@@ -1405,13 +1406,15 @@ button {
 .menu-btn:hover {
   background: rgba(239, 68, 68, 0.05);
   color: var(--primary);
+  border-color: rgba(239, 68, 68, 0.1);
 }
 
 .menu-btn.active {
-  background: var(--primary-glow);
-  border-color: var(--border-focus);
-  color: var(--primary);
-  font-weight: 600;
+  background: linear-gradient(135deg, var(--primary) 0%, #dc2626 100%);
+  color: #ffffff;
+  font-weight: 750;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+  border-color: transparent;
 }
 
 .menu-btn svg {
@@ -1635,6 +1638,305 @@ button {
 .header-exchange-rates b {
   color: var(--text);
   font-weight: 600;
+}
+
+/* Sepet Adet Arttırma/Azaltma Butonları Hover Efektleri */
+.cart-qty-dec-btn:hover,
+.cart-qty-inc-btn:hover {
+  background: #3b82f6 !important; /* Premium Mavi Renk */
+  color: #ffffff !important;
+  border-color: #3b82f6 !important;
+}
+
+/* Sepet Çekmecesi (Drawer) */
+.cart-drawer {
+  position: fixed;
+  top: 0;
+  right: -660px;
+  width: 640px;
+  height: 100%;
+  background: #ffffff;
+  box-shadow: -5px 0 30px rgba(0, 0, 0, 0.12);
+  z-index: 1050;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+}
+.cart-drawer.open {
+  right: 0;
+}
+.drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.3);
+  backdrop-filter: blur(4px);
+  z-index: 1040;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.drawer-overlay.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Sağ Üst Sepet Butonu */
+.header-cart-btn {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.header-cart-btn:hover {
+  background: var(--primary-glow) !important;
+  border-color: var(--primary) !important;
+  color: var(--primary) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.12);
+}
+
+.header-cart-btn:active {
+  transform: translateY(0);
+}
+
+.header-cart-btn .cart-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  background: var(--primary);
+  color: white;
+  border-radius: 12px;
+  padding: 1px 5px;
+  font-size: 9px;
+  font-weight: 750;
+  min-width: 14px;
+  text-align: center;
+  box-shadow: 0 2px 5px rgba(239, 68, 68, 0.3);
+  border: 2px solid var(--bg-card);
+  transition: transform 0.2s ease;
+}
+
+.header-cart-btn:active .cart-badge {
+  transform: scale(1.2);
+}
+
+/* Modern Çekmece Kart Yapısı */
+.cart-item-card {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.06);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  transition: var(--transition);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cart-item-card:hover {
+  border-color: rgba(239, 68, 68, 0.18);
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.04);
+}
+
+/* Kart Üst Satırı */
+.cart-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.cart-card-title-group {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cart-card-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.4;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cart-card-domain-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(239, 68, 68, 0.06);
+  color: var(--primary);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Hesaplamalar Satırı (Grid) */
+.cart-card-details-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  background: var(--bg-input);
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.01);
+}
+
+.cart-detail-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cart-detail-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.cart-detail-value {
+  font-size: 13.5px;
+  color: var(--text);
+  font-weight: 800;
+}
+
+/* Alt Aksiyon & Tutar Satırı */
+.cart-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.05);
+}
+
+/* Miktar Kontrolü */
+.cart-card-qty-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cart-qty-btn {
+  width: 25px;
+  height: 25px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  padding: 0;
+}
+
+.cart-qty-btn:hover {
+  border-color: var(--primary);
+  background: var(--primary-glow);
+  color: var(--primary);
+}
+
+.cart-qty-val {
+  font-size: 13.5px;
+  font-weight: 700;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* Tutar ve Kâr Sütunları */
+.cart-card-totals {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.cart-total-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.cart-total-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.cart-total-val {
+  font-size: 12.5px;
+  font-weight: 750;
+  color: var(--text);
+}
+
+.cart-profit-val {
+  font-size: 12.5px;
+  font-weight: 750;
+  color: #059669;
+}
+
+/* Kart Silme Butonu */
+.cart-card-delete-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  line-height: 1;
+}
+
+.cart-card-delete-btn:hover {
+  color: var(--primary);
+  background: var(--primary-glow);
+}
+
+/* Net Kar Hover Reveal */
+.sidebar-profit-row:hover .hover-reveal-profit {
+  filter: none !important;
+}
+
+/* Product Result Profit Hover Reveal */
+.profit-group {
+  cursor: pointer;
+}
+.profit-group .profit-main span[id^="profit-with-vat-"] {
+  filter: blur(4px);
+  transition: filter 0.25s ease;
+  background: rgba(5, 150, 105, 0.05);
+  padding: 1px 4px;
+  border-radius: 4px;
+  display: inline-block;
+}
+.profit-group:hover .profit-main span[id^="profit-with-vat-"] {
+  filter: none !important;
 }
 
 

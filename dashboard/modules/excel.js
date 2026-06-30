@@ -56,7 +56,7 @@ export async function fetchFromLocalFirat(query) {
 
         const typeName = getProductTypeName(item.name);
         const safeFilename = getSafeFilename(typeName);
-        const finalImg = safeFilename ? `images/${safeFilename}.jpeg` : 'logo.png';
+        const finalImg = safeFilename ? `images/${safeFilename}.jpeg` : '../logo.png';
 
         state.currentResults.push({
           key,
@@ -150,7 +150,7 @@ export async function loadDefaultExcelIfEmpty() {
             price,
             unit,
             packQuantity,
-            imgUrl: 'logo.png'
+            imgUrl: '../logo.png'
           });
         }
 
@@ -248,7 +248,7 @@ export function setupExcelListeners() {
               price,
               unit,
               packQuantity,
-              imgUrl: 'logo.png'
+              imgUrl: '../logo.png'
             });
           }
 

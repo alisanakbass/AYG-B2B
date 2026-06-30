@@ -17,7 +17,7 @@ export function addToSharedCart(product, addedQty, buttonEl) {
       sourceKey: product.sourceKey,
       unit: product.unit || 'ADET',
       packQuantity: product.packQuantity || 1,
-      imgUrl: product.imgUrl || 'logo.png'
+      imgUrl: product.imgUrl || '../logo.png'
     };
 
     chrome.storage.local.set({ cart: cart }, () => {
@@ -114,7 +114,7 @@ export function renderCart() {
     div.innerHTML = `
       <div class="cart-card-header" style="display: flex; gap: 10px; align-items: center;">
         <div class="cart-product-img-wrapper" style="width: 42px; height: 42px; background: var(--bg-input); border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(0,0,0,0.04); flex-shrink: 0;">
-          <img src="${item.imgUrl || 'logo.png'}" style="max-width: 100%; max-height: 100%; object-fit: contain;" onerror="this.src='logo.png'">
+          <img src="${item.imgUrl || '../logo.png'}" style="max-width: 100%; max-height: 100%; object-fit: contain;" onerror="this.src='../logo.png'">
         </div>
         <div class="cart-card-title-group" style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
           <h4 class="cart-card-title" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</h4>

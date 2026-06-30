@@ -671,7 +671,7 @@ document.addEventListener('error', (e) => {
       if (code) {
         img.src = 'https://cdn.jsdelivr.net/gh/alisanakbass/AYG-B2B@main/images/' + code + '.png';
       } else {
-        img.src = 'logo.png';
+        img.src = '../logo.png';
       }
     }
     else if (src.includes('images/')) {
@@ -680,10 +680,10 @@ document.addEventListener('error', (e) => {
       } else if (src.endsWith('.jpeg')) {
         img.src = src.replace('.jpeg', '.jpg');
       } else {
-        img.src = 'logo.png';
+        img.src = '../logo.png';
       }
     } else {
-      img.src = 'logo.png';
+      img.src = '../logo.png';
     }
   }
 }, true);

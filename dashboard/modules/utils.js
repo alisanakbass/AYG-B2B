@@ -156,7 +156,7 @@ export function getProductTypeName(name) {
 
 // En yakın görseli arayan algoritma
 export function getFiratProductImage(code) {
-  if (!code) return 'logo.png';
+  if (!code) return '../logo.png';
   const cleanCode = code.toString().trim();
   const IMAGE_BASE_URL = 'https://cdn.jsdelivr.net/gh/alisanakbass/AYG-B2B@main/images/';
 
@@ -174,5 +174,5 @@ export function getFiratProductImage(code) {
   }
 
   // 3. Fallback
-  return 'logo.png';
+  return '../logo.png';
 }

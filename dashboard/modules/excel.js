@@ -1,6 +1,7 @@
 import { state } from './state.js';
-import { parsePrice, cleanTurkishForSearch, getProductTypeName, getSafeFilename } from './utils.js';
+import { parsePrice, cleanTurkishForSearch, getProductTypeName, getSafeFilename, getSourceKeyFromDomain, calculateSellingPrice } from './utils.js';
 import { updateStatusIndicator } from './search.js';
+import { calculateTotalDiscountForProduct } from './discounts.js';
 
 // Fırat Boru istatistiklerini yükleyen fonksiyon
 export async function loadFiratStats() {
@@ -292,4 +293,313 @@ export function setupExcelListeners() {
       reader.readAsArrayBuffer(file);
     });
   }
+}
+
+// Sepetteki ürünleri teklif şablonuna yazıp indiren fonksiyon
+export async function exportCartAsExcelOffer(presetTeklifNo, metadata) {
+  const items = Object.values(state.currentCart);
+  if (items.length === 0) {
+    alert("Teklif oluşturabilmek için sepetinizde ürün bulunmalıdır.");
+    return;
+  }
+  
+  if (items.length > 22) {
+    alert("Teklif şablonu en fazla 22 ürün desteklemektedir. Lütfen sepetinizdeki ürün sayısını 22 veya daha az yapın.");
+    return;
+  }
+
+  // AYG_TEKLİF.xlsx şablonunu eklenti içinden yükle
+  const fileUrl = chrome.runtime.getURL("AYG_TEKLİF.xlsx");
+  const response = await fetch(fileUrl);
+  if (!response.ok) {
+    throw new Error(`Teklif şablonu (AYG_TEKLİF.xlsx) yüklenemedi: ${response.status}`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  
+  // JSZip ile zip dosyasını yükle
+  const zip = new JSZip();
+  await zip.loadAsync(arrayBuffer);
+  
+  // sheet1.xml ve styles.xml dosyalarını string olarak oku
+  const sheetXmlText = await zip.file("xl/worksheets/sheet1.xml").async("string");
+  const stylesXmlText = await zip.file("xl/styles.xml").async("string");
+  
+  // XML DOM ağaçlarına dönüştür
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(sheetXmlText, "application/xml");
+  const stylesDoc = parser.parseFromString(stylesXmlText, "application/xml");
+
+  const ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+  // Sütun harfini sayısal indekse çevir (OpenXML sıralaması için)
+  function colToNumber(col) {
+    let num = 0;
+    for (let i = 0; i < col.length; i++) {
+      num = num * 26 + (col.charCodeAt(i) - 64);
+    }
+    return num;
+  }
+
+  // Yardımcı fonksiyonlar: Namespace'den bağımsız eleman bulma
+  function findRow(r) {
+    const rows = xmlDoc.getElementsByTagNameNS(ns, "row");
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].getAttribute("r") === String(r)) {
+        return rows[i];
+      }
+    }
+    return null;
+  }
+
+  function findCell(rowNode, addr) {
+    const cells = rowNode.getElementsByTagNameNS(ns, "c");
+    for (let i = 0; i < cells.length; i++) {
+      if (cells[i].getAttribute("r") === addr) {
+        return cells[i];
+      }
+    }
+    return null;
+  }
+
+  // Hücre değerlerini ve formüllerini stili bozmadan XML düzeyinde güncellemek için yardımcı fonksiyon
+  function setCell(r, c, val, type, formula) {
+    const addr = `${c}${r}`;
+    
+    // Satırı bul veya oluştur
+    let rowNode = findRow(r);
+    if (!rowNode) {
+      rowNode = xmlDoc.createElementNS(ns, "row");
+      rowNode.setAttribute("r", String(r));
+      
+      const sheetData = xmlDoc.getElementsByTagNameNS(ns, "sheetData")[0];
+      if (sheetData) {
+        // Satırı numara sırasına göre doğru konuma yerleştir
+        const siblingRows = sheetData.getElementsByTagNameNS(ns, "row");
+        let inserted = false;
+        for (let i = 0; i < siblingRows.length; i++) {
+          const siblingR = parseInt(siblingRows[i].getAttribute("r"), 10);
+          if (siblingR > r) {
+            sheetData.insertBefore(rowNode, siblingRows[i]);
+            inserted = true;
+            break;
+          }
+        }
+        if (!inserted) {
+          sheetData.appendChild(rowNode);
+        }
+      } else {
+        return;
+      }
+    }
+
+    // Hücreyi bul veya oluştur
+    let cellNode = findCell(rowNode, addr);
+    if (!cellNode) {
+      cellNode = xmlDoc.createElementNS(ns, "c");
+      cellNode.setAttribute("r", addr);
+      
+      // Hücreyi sütun sırasına göre doğru konuma yerleştir
+      const newColNum = colToNumber(c);
+      const siblingCells = rowNode.getElementsByTagNameNS(ns, "c");
+      let inserted = false;
+      for (let i = 0; i < siblingCells.length; i++) {
+        const siblingAddr = siblingCells[i].getAttribute("r");
+        const siblingCol = siblingAddr.replace(/[0-9]/g, "");
+        if (colToNumber(siblingCol) > newColNum) {
+          rowNode.insertBefore(cellNode, siblingCells[i]);
+          inserted = true;
+          break;
+        }
+      }
+      if (!inserted) {
+        rowNode.appendChild(cellNode);
+      }
+    }
+
+    // Eğer değer null, undefined veya boş ise hücreyi temizle ve t özniteliğini kaldır
+    if (val === null || val === undefined || val === "") {
+      if (!formula) {
+        cellNode.removeAttribute("t");
+        cellNode.innerHTML = "";
+        return;
+      }
+    }
+
+    // Hücre değerini ata
+    if (type === 's') {
+      cellNode.setAttribute("t", "inlineStr");
+      cellNode.innerHTML = "";
+      
+      const isNode = xmlDoc.createElementNS(ns, "is");
+      const tNode = xmlDoc.createElementNS(ns, "t");
+      tNode.textContent = val;
+      isNode.appendChild(tNode);
+      cellNode.appendChild(isNode);
+    } else if (type === 'n') {
+      cellNode.setAttribute("t", "n");
+      cellNode.innerHTML = "";
+      
+      if (formula) {
+        const fNode = xmlDoc.createElementNS(ns, "f");
+        fNode.textContent = formula;
+        cellNode.appendChild(fNode);
+      }
+      
+      if (val !== undefined && val !== null && val !== "") {
+        const vNode = xmlDoc.createElementNS(ns, "v");
+        vNode.textContent = val;
+        cellNode.appendChild(vNode);
+      }
+    }
+  }
+
+  // Ürünlerin doldurulacağı başlangıç satırı (Excel'de 18. satır)
+  const startRow = 18;
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const r = startRow + i;
+
+    // Fiyat ve indirim hesaplamaları
+    const sourceKey = item.sourceKey || getSourceKeyFromDomain(item.domain);
+    const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
+    const margin = state.siteMargins[sourceKey] !== undefined ? state.siteMargins[sourceKey] : state.currentMargin;
+    
+    // KDV'siz birim satış fiyatı
+    const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false);
+    const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
+    
+    // Paket/Adet çarpanı
+    const itemUnit = (item.unit || 'ADET').toUpperCase();
+    const itemPackQty = item.packQuantity || 1;
+    const multiplier = itemUnit === 'ADET' ? 1 : itemPackQty;
+    
+    const finalUnitPrice = unitPriceNoVat * multiplier;
+
+    // Hücreleri XML düzeyinde güncelle (stilleri bozmadan)
+    setCell(r, 'D', item.name, 's');
+    setCell(r, 'I', itemUnit, 's');
+    setCell(r, 'J', item.qty, 'n');
+    setCell(r, 'L', Number(finalUnitPrice.toFixed(2)), 'n');
+    setCell(r, 'M', undefined, 'n', `J${r}*L${r}`);
+  }
+
+  // Boş kalan teklif satırlarını temizle (varsa eski verilerden kurtulmak için)
+  for (let i = items.length; i < 22; i++) {
+    const r = startRow + i;
+    setCell(r, 'D', "", 's');
+    setCell(r, 'I', "", 's');
+    setCell(r, 'J', null, 'n');
+    setCell(r, 'L', null, 'n');
+    setCell(r, 'M', null, 'n');
+  }
+
+  // Tarih ve Teklif No güncelle (K11 ve K12 orijinal etiketleri korunur, L11 ve L12 hücrelerine değerler yazılır)
+  const bugun = new Date().toLocaleDateString('tr-TR');
+  const teklifNo = presetTeklifNo || ("AYG-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "-" + Math.floor(1000 + Math.random() * 9000));
+
+  setCell(11, 'L', teklifNo, 's');
+  setCell(12, 'L', bugun, 's');
+
+  // Müşteri bilgilerini Excel'e yaz (B sütunu hücreleri hedef alınarak başlık etiketleriyle yazılır)
+  if (metadata) {
+    setCell(10, 'B', `SAYIN: ${metadata.sayin || ""}`, 's');
+    setCell(11, 'B', `Adres  : ${metadata.adres || ""}`, 's');
+    setCell(13, 'B', `SEVK ADRESİ: ${metadata.sevkAdresi || ""}`, 's');
+    setCell(14, 'B', `   Telefon: ${metadata.telefon || ""}`, 's');
+    setCell(14, 'F', `Fax : ${metadata.fax || ""}`, 's');
+    setCell(14, 'L', metadata.sayinSag || "", 's');
+    setCell(15, 'B', `   Vergi Dairesi: ${metadata.vergiDairesi || ""}`, 's');
+    setCell(15, 'F', `Vergi No : ${metadata.vergiNo || ""}`, 's');
+  }
+
+  // mergeCells düğümünü dinamik olarak güncelle
+  const mergeCellsEl = xmlDoc.getElementsByTagNameNS(ns, "mergeCells")[0];
+  if (mergeCellsEl) {
+    const mergeCellsList = Array.from(mergeCellsEl.getElementsByTagNameNS(ns, "mergeCell"));
+    
+    // Çakışan eski birleştirmeleri temizle
+    const rangesToRemove = [
+      "C10:F10", "C11:F11", "B14:C14", "B15:C15",
+      "D14:E14", "D15:E15", "G14:H14", "G15:H15"
+    ];
+    
+    mergeCellsList.forEach(mc => {
+      const ref = mc.getAttribute("ref");
+      if (rangesToRemove.includes(ref)) {
+        mergeCellsEl.removeChild(mc);
+      }
+    });
+    
+    // Kullanıcının istediği yeni birleştirme aralıklarını ekle
+    const newRanges = [
+      "B10:D10",
+      "B11:D11",
+      "B13:D13",
+      "B14:D14",
+      "B15:D15",
+      "F14:H14",
+      "F15:H15"
+    ];
+    
+    newRanges.forEach(ref => {
+      let exists = false;
+      const currentCells = mergeCellsEl.getElementsByTagNameNS(ns, "mergeCell");
+      for (let i = 0; i < currentCells.length; i++) {
+        if (currentCells[i].getAttribute("ref") === ref) {
+          exists = true;
+          break;
+        }
+      }
+      if (!exists) {
+        const newMc = xmlDoc.createElementNS(ns, "mergeCell");
+        newMc.setAttribute("ref", ref);
+        mergeCellsEl.appendChild(newMc);
+      }
+    });
+    
+    // Count özniteliğini güncelle
+    const finalCells = mergeCellsEl.getElementsByTagNameNS(ns, "mergeCell");
+    mergeCellsEl.setAttribute("count", String(finalCells.length));
+  }
+
+  // J5 hücresinin stili (s="28") için dikey hizalamayı "top" (üst) olarak güncelle
+  if (stylesDoc) {
+    const cellXfs = stylesDoc.getElementsByTagName("cellXfs")[0];
+    if (cellXfs) {
+      const xfs = cellXfs.getElementsByTagName("xf");
+      const xf28 = xfs[28];
+      if (xf28) {
+        let alignment = xf28.getElementsByTagName("alignment")[0];
+        if (!alignment) {
+          alignment = stylesDoc.createElementNS(ns, "alignment");
+          xf28.appendChild(alignment);
+        }
+        alignment.setAttribute("vertical", "top");
+        xf28.setAttribute("applyAlignment", "1");
+      }
+    }
+  }
+
+  // XML belgelerini geri string'e dönüştür
+  const serializer = new XMLSerializer();
+  const newSheetXmlText = serializer.serializeToString(xmlDoc);
+  const newStylesXmlText = serializer.serializeToString(stylesDoc);
+  
+  // ZIP dosyasına güncel dosyaları yaz
+  zip.file("xl/worksheets/sheet1.xml", newSheetXmlText);
+  zip.file("xl/styles.xml", newStylesXmlText);
+  
+  // ZIP dosyasını oluştur ve indir
+  const zipContent = await zip.generateAsync({ type: "blob" });
+  
+  const url = URL.createObjectURL(zipContent);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `AYG_TEKLIF_${teklifNo}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }

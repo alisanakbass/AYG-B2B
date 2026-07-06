@@ -1,5 +1,5 @@
 import { state, DEFAULT_URLS } from './modules/state.js';
-import { formatPrice } from './modules/utils.js';
+import { formatPrice, getSourceKeyFromDomain, calculateSellingPrice } from './modules/utils.js';
 import { initDiscounts, calculateTotalDiscountForProduct, renderKeywordDiscountRules, renderProductDiscountRules, reapplyAllDiscounts } from './modules/discounts.js';
 import { renderCart, renderReports, confirmCart, submitCart, clearSalesHistory } from './modules/cart.js';
 import { loadFiratStats, loadDefaultExcelIfEmpty, setupExcelListeners } from './modules/excel.js';
@@ -297,6 +297,186 @@ function setupUIEventListeners() {
           state.currentCart = {};
           renderCart();
         });
+      }
+    });
+  }
+
+  // Teklif Ön İzleme ve İndirme Yönetimi
+  let activeTeklifNo = "";
+  const sidebarExportOfferBtn = document.getElementById('sidebar-export-offer-btn');
+  const offerPreviewModal = document.getElementById('offer-preview-modal');
+  const offerPreviewCloseBtn = document.getElementById('offer-preview-close-btn');
+  const offerPreviewCancelBtn = document.getElementById('offer-preview-cancel-btn');
+  const offerPreviewDownloadBtn = document.getElementById('offer-preview-download-btn');
+  const previewTbody = document.getElementById('preview-offer-items-tbody');
+
+  console.log("[B2B Teklif] DOM Başlatıldı. Element Kontrolleri:", {
+    sidebarExportOfferBtn: !!sidebarExportOfferBtn,
+    offerPreviewModal: !!offerPreviewModal,
+    offerPreviewCloseBtn: !!offerPreviewCloseBtn,
+    offerPreviewCancelBtn: !!offerPreviewCancelBtn,
+    offerPreviewDownloadBtn: !!offerPreviewDownloadBtn,
+    previewTbody: !!previewTbody
+  });
+
+  if (sidebarExportOfferBtn && offerPreviewModal) {
+    sidebarExportOfferBtn.addEventListener('click', () => {
+      console.log("[B2B Teklif] Teklif butonuna tıklandı.");
+      try {
+        const items = Object.values(state.currentCart);
+        console.log("[B2B Teklif] Sepet öğeleri sayısı:", items.length, items);
+        
+        if (items.length === 0) {
+          alert("Teklif oluşturabilmek için sepetinizde ürün bulunmalıdır.");
+          return;
+        }
+        
+        if (items.length > 22) {
+          alert("Teklif şablonu en fazla 22 ürün desteklemektedir. Lütfen sepetinizdeki ürün sayısını 22 veya daha az yapın.");
+          return;
+        }
+
+        // Tarih ve Teklif No üret
+        const bugun = new Date().toLocaleDateString('tr-TR');
+        activeTeklifNo = "AYG-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "-" + Math.floor(1000 + Math.random() * 9000);
+        console.log("[B2B Teklif] Üretilen Teklif No:", activeTeklifNo, "Tarih:", bugun);
+        
+        const previewNoEl = document.getElementById('preview-teklif-no');
+        const previewTarihEl = document.getElementById('preview-tarih');
+        
+        if (previewNoEl) previewNoEl.textContent = activeTeklifNo;
+        if (previewTarihEl) previewTarihEl.textContent = bugun;
+
+        // Düzenlenebilir alanları sıfırla
+        const editableIds = ['input-sayin', 'input-adres', 'input-sevk-adresi', 'input-telefon', 'input-fax', 'input-vergi-dairesi', 'input-vergi-no', 'input-sayin-sag'];
+        editableIds.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = "";
+        });
+
+        // Tabloyu temizle ve doldur
+        if (previewTbody) {
+          previewTbody.innerHTML = "";
+        } else {
+          throw new Error("preview-offer-items-tbody elementi bulunamadı!");
+        }
+        
+        let grandTotalNoVat = 0;
+        const startRow = 18;
+
+        // Sepetteki ürünleri ekle
+        for (let i = 0; i < 22; i++) {
+          const item = items[i];
+          
+          if (item) {
+            console.log(`[B2B Teklif] İşleniyor Satır ${i+1}:`, item.name);
+            const sourceKey = item.sourceKey || getSourceKeyFromDomain(item.domain);
+            const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
+            const margin = state.siteMargins[sourceKey] !== undefined ? state.siteMargins[sourceKey] : state.currentMargin;
+            
+            const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false);
+            const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
+            
+            const itemUnit = (item.unit || 'ADET').toUpperCase();
+            const itemPackQty = item.packQuantity || 1;
+            const multiplier = itemUnit === 'ADET' ? 1 : itemPackQty;
+            
+            const finalUnitPrice = unitPriceNoVat * multiplier;
+            const totalNoVat = finalUnitPrice * item.qty;
+            grandTotalNoVat += totalNoVat;
+
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = "1px solid #000";
+            tr.innerHTML = `
+              <td style="border-right: 1px solid #000; padding: 6px; text-align: center;">${i + 1}</td>
+              <td style="border-right: 1px solid #000; padding: 6px; text-align: left; font-weight: 500;">${item.name}</td>
+              <td style="border-right: 1px solid #000; padding: 6px; text-align: center;">${itemUnit}</td>
+              <td style="border-right: 1px solid #000; padding: 6px; text-align: center;">${item.qty}</td>
+              <td style="border-right: 1px solid #000; padding: 6px; text-align: right;">${formatPrice(finalUnitPrice).replace(" TL", "")}</td>
+              <td style="padding: 6px; text-align: right;">${formatPrice(totalNoVat).replace(" TL", "")}</td>
+            `;
+            previewTbody.appendChild(tr);
+          } else {
+            // Boş satır ekle (şablonu taklit etmek için)
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = "1px solid #000";
+            tr.style.height = "25px";
+            tr.innerHTML = `
+              <td style="border-right: 1px solid #000; padding: 6px; text-align: center;">${i + 1}</td>
+              <td style="border-right: 1px solid #000; padding: 6px;"></td>
+              <td style="border-right: 1px solid #000; padding: 6px;"></td>
+              <td style="border-right: 1px solid #000; padding: 6px;"></td>
+              <td style="border-right: 1px solid #000; padding: 6px;"></td>
+              <td style="padding: 6px;"></td>
+            `;
+            previewTbody.appendChild(tr);
+          }
+        }
+
+        // Toplam değeri yaz
+        const totalValEl = document.getElementById('preview-offer-total-val');
+        if (totalValEl) totalValEl.textContent = formatPrice(grandTotalNoVat);
+
+        // Modalı aç
+        offerPreviewModal.classList.add('open');
+        console.log("[B2B Teklif] Modal başarıyla açıldı.");
+      } catch (err) {
+        console.error("[B2B Teklif] Tıklama dinleyicisinde hata:", err);
+        alert("Ön izleme yüklenirken hata oluştu: " + err.message);
+      }
+    });
+  } else {
+    console.error("[B2B Teklif] sidebarExportOfferBtn veya offerPreviewModal DOM'da bulunamadı!");
+  }
+
+  // Modalı Kapatma Dinleyicileri
+  const closeOfferModal = () => {
+    if (offerPreviewModal) offerPreviewModal.classList.remove('open');
+  };
+
+  if (offerPreviewCloseBtn) offerPreviewCloseBtn.addEventListener('click', closeOfferModal);
+  if (offerPreviewCancelBtn) offerPreviewCancelBtn.addEventListener('click', closeOfferModal);
+  if (offerPreviewModal) {
+    offerPreviewModal.addEventListener('click', (e) => {
+      if (e.target === offerPreviewModal) closeOfferModal();
+    });
+  }
+
+  // Modaldan Excel İndirme
+  if (offerPreviewDownloadBtn) {
+    offerPreviewDownloadBtn.addEventListener('click', async () => {
+      try {
+        offerPreviewDownloadBtn.disabled = true;
+        const originalText = offerPreviewDownloadBtn.innerHTML;
+        offerPreviewDownloadBtn.innerHTML = "İndiriliyor...";
+
+        const getVal = (id) => {
+          const el = document.getElementById(id);
+          return el ? el.textContent.trim() : "";
+        };
+
+        const metadata = {
+          sayin: getVal('input-sayin'),
+          adres: getVal('input-adres'),
+          sevkAdresi: getVal('input-sevk-adresi'),
+          telefon: getVal('input-telefon'),
+          fax: getVal('input-fax'),
+          vergiDairesi: getVal('input-vergi-dairesi'),
+          vergiNo: getVal('input-vergi-no'),
+          sayinSag: getVal('input-sayin-sag')
+        };
+
+        const { exportCartAsExcelOffer } = await import('./modules/excel.js');
+        await exportCartAsExcelOffer(activeTeklifNo, metadata);
+
+        offerPreviewDownloadBtn.innerHTML = originalText;
+        offerPreviewDownloadBtn.disabled = false;
+        closeOfferModal();
+      } catch (err) {
+        console.error(err);
+        alert("Excel oluşturulurken bir hata oluştu: " + err.message);
+        offerPreviewDownloadBtn.innerHTML = "Excel Olarak İndir";
+        offerPreviewDownloadBtn.disabled = false;
       }
     });
   }

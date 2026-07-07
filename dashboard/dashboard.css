@@ -699,6 +699,76 @@ button {
 .results-info {
   font-size: 13.5px;
   color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.site-filters {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.filter-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-family: var(--font);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  outline: none;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+
+.filter-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-glow);
+}
+
+.filter-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+}
+
+.filter-btn .site-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.filter-btn .site-dot.site_all { background: #64748b; }
+.filter-btn .site-dot.site_a { background: #c084fc; }
+.filter-btn .site-dot.site_b { background: #60a5fa; }
+.filter-btn .site-dot.site_c { background: #fbbf24; }
+.filter-btn .site-dot.site_d { background: #f472b6; }
+.filter-btn .site-dot.site_e { background: #10b981; }
+.filter-btn .site-dot.site_g { background: #fb923c; }
+
+.filter-btn .filter-count {
+  font-size: 10px;
+  background: rgba(0, 0, 0, 0.08);
+  padding: 1px 5px;
+  border-radius: 10px;
+  margin-left: 2px;
+  display: inline-block;
+  font-weight: 700;
+}
+
+.filter-btn.active .filter-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
 }
 
 /* Dropdown list styling */
@@ -812,6 +882,11 @@ button {
   color: #fbbf24;
 }
 
+.source-badge.site_d {
+  background: rgba(236, 72, 153, 0.12);
+  color: #f472b6;
+}
+
 .source-badge.site_e {
   background: rgba(16, 185, 129, 0.12);
   color: #10b981;
@@ -820,6 +895,11 @@ button {
 .source-badge.site_f {
   background: rgba(239, 68, 68, 0.12);
   color: #f87171;
+}
+
+.source-badge.site_g {
+  background: rgba(251, 146, 60, 0.12);
+  color: #fb923c;
 }
 
 .product-name-cell {

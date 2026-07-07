@@ -69,17 +69,20 @@ async function loadSettings() {
       margin_site_d: 40,
       margin_site_e: 40,
       margin_site_f: 40,
+      margin_site_g: 40,
       discount_site_a: 0,
       discount_site_b: 0,
       discount_site_c: 0,
       discount_site_d: 0,
       discount_site_e: 0,
       discount_site_f: 0,
+      discount_site_g: 0,
       url_site_a: DEFAULT_URLS.url_site_a,
       url_site_b: DEFAULT_URLS.url_site_b,
       url_site_c: DEFAULT_URLS.url_site_c,
       url_site_d: DEFAULT_URLS.url_site_d,
       url_site_e: DEFAULT_URLS.url_site_e,
+      url_site_g: DEFAULT_URLS.url_site_g,
       productDiscounts: {},
       keywordDiscounts: [],
       cred_user_site_a: "info@aygunleryapi.com",
@@ -90,7 +93,9 @@ async function loadSettings() {
       cred_user_site_c: "1",
       cred_pass_site_c: "AYGUNLER",
       cred_user_site_d: "17183",
-      cred_pass_site_d: "27f4e5d"
+      cred_pass_site_d: "27f4e5d",
+      cred_user_site_g: "",
+      cred_pass_site_g: ""
     }, (items) => {
       state.currentMargin = items.margin;
       state.siteMargins = {
@@ -99,7 +104,8 @@ async function loadSettings() {
         SITE_C: items.margin_site_c,
         SITE_D: items.margin_site_d,
         SITE_E: items.margin_site_e,
-        SITE_F: items.margin_site_f
+        SITE_F: items.margin_site_f,
+        SITE_G: items.margin_site_g
       };
       state.siteDiscounts = {
         SITE_A: items.discount_site_a,
@@ -107,7 +113,8 @@ async function loadSettings() {
         SITE_C: items.discount_site_c,
         SITE_D: items.discount_site_d,
         SITE_E: items.discount_site_e,
-        SITE_F: items.discount_site_f
+        SITE_F: items.discount_site_f,
+        SITE_G: items.discount_site_g
       };
       state.currentProductDiscounts = items.productDiscounts || {};
       state.keywordDiscounts = items.keywordDiscounts || [];
@@ -115,7 +122,7 @@ async function loadSettings() {
       const modalMargin = document.getElementById('modal-margin');
       if (modalMargin) modalMargin.value = items.margin;
 
-      ['a', 'b', 'c', 'd', 'e', 'f'].forEach(letter => {
+      ['a', 'b', 'c', 'd', 'e', 'f', 'g'].forEach(letter => {
         const key = `SITE_${letter.toUpperCase()}`;
         const mInput = document.getElementById(`margin-site-${letter}`);
         const dInput = document.getElementById(`discount-site-${letter}`);
@@ -128,11 +135,13 @@ async function loadSettings() {
       const modalUrlC = document.getElementById('modal-url-site-c');
       const modalUrlD = document.getElementById('modal-url-site-d');
       const modalUrlE = document.getElementById('modal-url-site-e');
+      const modalUrlG = document.getElementById('modal-url-site-g');
       if (modalUrlA) modalUrlA.value = items.url_site_a;
       if (modalUrlB) modalUrlB.value = items.url_site_b;
       if (modalUrlC) modalUrlC.value = items.url_site_c;
       if (modalUrlD) modalUrlD.value = items.url_site_d;
       if (modalUrlE) modalUrlE.value = items.url_site_e;
+      if (modalUrlG) modalUrlG.value = items.url_site_g;
 
       // Giriş Bilgilerini Doldur
       const cUserA = document.getElementById('cred-user-site-a');
@@ -144,6 +153,8 @@ async function loadSettings() {
       const cPassC = document.getElementById('cred-pass-site-c');
       const cUserD = document.getElementById('cred-user-site-d');
       const cPassD = document.getElementById('cred-pass-site-d');
+      const cUserG = document.getElementById('cred-user-site-g');
+      const cPassG = document.getElementById('cred-pass-site-g');
 
       if (cUserA) cUserA.value = items.cred_user_site_a || "info@aygunleryapi.com";
       if (cPassA) cPassA.value = items.cred_pass_site_a || "FZ0DT1YL*0OE";
@@ -154,6 +165,8 @@ async function loadSettings() {
       if (cPassC) cPassC.value = items.cred_pass_site_c || "AYGUNLER";
       if (cUserD) cUserD.value = items.cred_user_site_d || "17183";
       if (cPassD) cPassD.value = items.cred_pass_site_d || "27f4e5d";
+      if (cUserG) cUserG.value = items.cred_user_site_g || "";
+      if (cPassG) cPassG.value = items.cred_pass_site_g || "";
 
       renderKeywordDiscountRules();
       renderProductDiscountRules();
@@ -219,7 +232,7 @@ function setupUIEventListeners() {
   });
 
   // Site Bazlı Kâr Marjı ve Genel İskonto Dinleyicileri
-  ['a', 'b', 'c', 'd', 'e', 'f'].forEach(letter => {
+  ['a', 'b', 'c', 'd', 'e', 'f', 'g'].forEach(letter => {
     const key = `SITE_${letter.toUpperCase()}`;
     const mInput = document.getElementById(`margin-site-${letter}`);
     const dInput = document.getElementById(`discount-site-${letter}`);
@@ -252,13 +265,15 @@ function setupUIEventListeners() {
     const urlC = document.getElementById('modal-url-site-c').value.trim();
     const urlD = document.getElementById('modal-url-site-d').value.trim();
     const urlE = document.getElementById('modal-url-site-e').value.trim();
+    const urlG = document.getElementById('modal-url-site-g').value.trim();
 
     chrome.storage.sync.set({
       url_site_a: urlA,
       url_site_b: urlB,
       url_site_c: urlC,
       url_site_d: urlD,
-      url_site_e: urlE
+      url_site_e: urlE,
+      url_site_g: urlG
     }, () => {
       alert("URL şablonları başarıyla kaydedildi!");
       checkAllSessions();
@@ -700,6 +715,8 @@ function setupUIEventListeners() {
       const passC = document.getElementById('cred-pass-site-c').value.trim();
       const userD = document.getElementById('cred-user-site-d').value.trim();
       const passD = document.getElementById('cred-pass-site-d').value.trim();
+      const userG = document.getElementById('cred-user-site-g').value.trim();
+      const passG = document.getElementById('cred-pass-site-g').value.trim();
 
       chrome.storage.sync.set({
         cred_user_site_a: userA,
@@ -710,7 +727,9 @@ function setupUIEventListeners() {
         cred_user_site_c: userC,
         cred_pass_site_c: passC,
         cred_user_site_d: userD,
-        cred_pass_site_d: passD
+        cred_pass_site_d: passD,
+        cred_user_site_g: userG,
+        cred_pass_site_g: passG
       }, () => {
         alert("B2B giriş bilgileri başarıyla kaydedildi!");
       });

@@ -5,18 +5,20 @@ const DEFAULT_URLS = {
   SITE_B: "https://b2b.enderyapi.com.tr/tr/urunler-s-{query}?page=1",
   SITE_C: "https://bayi.yasarteknik.com.tr/YeniSiparisGir.asp?F=Ara&FAdi={query}",
   SITE_D: "https://yenibayi.polisankansai.com/order/makeordernew?search={query}",
-  SITE_E: "https://bayi.akyuztools.com/Search/SearchProduct"
+  SITE_E: "https://bayi.akyuztools.com/Search/SearchProduct",
+  SITE_G: "https://www.nalburdayim.com/search/?q={query}"
 };
 
 // Eklenti yüklendiğinde veya güncellendiğinde alarmı kur ve kuralları ayarla
 chrome.runtime.onInstalled.addListener(() => {
-  // Sadece Yaşar Teknik oturumunu 10 dakikada bir yenilemek için alarmı ayarla
-  chrome.alarms.create("b2b_keepalive", { periodInMinutes: 10 });
+  // Sadece Yaşar Teknik oturumunu 3 dakikada bir yenilemek için alarmı ayarla
+  chrome.alarms.create("b2b_keepalive", { periodInMinutes: 3 });
   setupDeclarativeRules();
 });
 
-// Servis çalıştırıcı her uyandığında kuralları doğrula/tanımla
+// Servis çalıştırıcı her uyandığında kuralları doğrula/tanımla ve alarmın kurulu olduğundan emin ol
 setupDeclarativeRules();
+chrome.alarms.create("b2b_keepalive", { periodInMinutes: 3 });
 
 // Akyüzler için Origin ve Referer başlıklarını manipüle etme kuralları
 async function setupDeclarativeRules() {
@@ -62,10 +64,37 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === "b2b_keepalive") {
     const open = await isDashboardOpen();
     if (open) {
-      performLoginForSite('SITE_C');
+      await keepYasarTeknikAlive();
     }
   }
 });
+
+// Yaşar Teknik oturumunu sessizce canlı tutan fonksiyon
+async function keepYasarTeknikAlive() {
+  try {
+    const response = await fetch("https://bayi.yasarteknik.com.tr/Default.asp", {
+      method: "GET",
+      credentials: "include"
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP Hata: ${response.status}`);
+    }
+    const htmlText = await response.text();
+    // Oturumun açık olup olmadığını kontrol edelim.
+    // Eğer sayfada şifre girişi veya login-form varsa ya da Default.asp yerine Login.asp yönlendirmesi olmuşsa oturum kapalı demektir.
+    const isLoginPage = htmlText.includes('login-form') || htmlText.includes('KullaniciAdiForm') || htmlText.includes('KullaniciKodu');
+
+    if (isLoginPage) {
+      console.log("[B2B KeepAlive] Yaşar Teknik oturumu kapalı, otomatik giriş yapılıyor...");
+      await performLoginForSite('SITE_C');
+    } else {
+      console.log("[B2B KeepAlive] Yaşar Teknik oturumu aktif, ping başarılı.");
+      await updateStorageSession('SITE_C', true);
+    }
+  } catch (error) {
+    console.error("[B2B KeepAlive] Yaşar Teknik ping hatası:", error);
+  }
+}
 
 // Arayüzden gelen mesajları dinleme
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -91,7 +120,8 @@ async function performBackgroundLoginForAll() {
     'site-b-check': true,
     'site-c-check': true,
     'site-d-check': true,
-    'site-e-check': true
+    'site-e-check': true,
+    'site-g-check': false
   }, r));
 
   const results = {};
@@ -110,11 +140,64 @@ async function performBackgroundLoginForAll() {
   if (storage['site-e-check']) {
     results.SITE_E = await performLoginForSite('SITE_E');
   }
+  if (storage['site-g-check']) {
+    results.SITE_G = await performLoginForSite('SITE_G');
+  }
   return results;
 }
 
 // Belirli bir site için giriş işlemini gerçekleştir
 async function performLoginForSite(siteKey, isManual = false) {
+  if (siteKey === 'SITE_G') {
+    if (isManual) {
+      const loginUrl = "https://www.nalburdayim.com/login/";
+      try {
+        await chrome.tabs.create({ url: loginUrl, active: true });
+        return { success: true, message: "Giriş Sayfası Açıldı" };
+      } catch (e) {
+        return { success: false, message: e.message };
+      }
+    }
+    await updateStorageSession('SITE_G', true);
+    return { success: true, message: "Aktif" };
+  }
+
+  if (siteKey === 'SITE_C') {
+    // Yaşar Teknik için sekme açmak yerine önce sessizce arka planda AJAX POST giriş deniyoruz.
+    const creds = await new Promise(r => chrome.storage.sync.get({
+      cred_company_site_c: "12001451",
+      cred_user_site_c: "1",
+      cred_pass_site_c: "AYGUNLER"
+    }, r));
+    
+    const companyCode = creds.cred_company_site_c || "12001451";
+    const username = creds.cred_user_site_c || "1";
+    const password = creds.cred_pass_site_c || "AYGUNLER";
+
+    try {
+      const loginRes = await fetch("https://bayi.yasarteknik.com.tr/ajax/Login.asp", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: `KullaniciAdiForm=${encodeURIComponent(companyCode)}&KullaniciKodu=${encodeURIComponent(username)}&Sifre=${encodeURIComponent(password)}`
+      });
+
+      if (loginRes.ok) {
+        const text = await loginRes.text();
+        if (text.trim() === "1" || text.trim() === "0") {
+          console.log("[B2B Background] Yaşar Teknik sessiz giriş başarılı.");
+          await updateStorageSession('SITE_C', true);
+          return { success: true, message: "Oturum Sessizce Açıldı" };
+        }
+      }
+    } catch (err) {
+      console.error("[B2B Background] Yaşar Teknik sessiz giriş hatası:", err);
+    }
+    console.log("[B2B Background] Yaşar Teknik sessiz giriş başarısız oldu, sekmeli yönteme geçiliyor.");
+  }
+
   if (siteKey === 'SITE_E') {
     // Akyüzler için eğer manuel tıklama yapıldıysa giriş sayfasını yeni sekmede açıyoruz.
     // Arka plan otomatik tetiklemelerinde ise sadece token kontrolü yapıyoruz.

@@ -41,10 +41,13 @@ export async function fetchFromLocalFirat(query) {
       }
 
       const queryClean = cleanTurkishForSearch(query);
+      const queryWords = queryClean.split(/\s+/).filter(w => w.length > 0);
+
       const matches = list.filter(item => {
+        if (queryWords.length === 0) return false;
         const nameClean = item.name ? cleanTurkishForSearch(item.name) : '';
         const codeClean = item.code ? item.code.toLowerCase().trim() : '';
-        return nameClean.includes(queryClean) || codeClean.includes(queryClean);
+        return queryWords.every(word => nameClean.includes(word) || codeClean.includes(word));
       });
 
       const siteKey = 'SITE_F';

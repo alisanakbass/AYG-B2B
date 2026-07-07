@@ -7,6 +7,49 @@ let imageFetchQueue = [];
 
 // --- DYNAMIC SELECTORS ---
 export const PARSERS = {
+  SITE_G: {
+    name: "Nalburdayım",
+    badgeClass: "site_g",
+    rowSelector: '.art',
+    parseRow: (row, domain) => {
+      const nameEl = row.querySelector('.art-title a') || row.querySelector('.art-title') || row.querySelector('a:not(.art-picture)');
+      if (!nameEl) return null;
+      const name = nameEl.textContent.trim();
+
+      const priceEl = row.querySelector('.art-price-value') || row.querySelector('.pd-finalprice-amount') || row.querySelector('.price-amount') || row.querySelector('.price') || row.querySelector('.art-price');
+      if (!priceEl) return null;
+      const rawPrice = parsePrice(priceEl.textContent);
+      const basePrice = rawPrice / 1.20; // KDV dahil fiyattan KDV'yi düşüyoruz.
+
+      const codeId = row.getAttribute('data-id') || '';
+      const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
+      const key = `b2b_${domain.replace(/\./g, '_')}_${codeId || cleanName}`;
+
+      let imgUrl = '';
+      const imgEl = row.querySelector('.art-picture img') || row.querySelector('.gal-item-viewport') || row.querySelector('img') || row.querySelector('a[href*="/media/"]');
+      if (imgEl) {
+        if (imgEl.tagName.toLowerCase() === 'img') {
+          imgUrl = imgEl.getAttribute('data-src') || imgEl.getAttribute('data-original') || imgEl.getAttribute('src') || '';
+        } else if (imgEl.tagName.toLowerCase() === 'a') {
+          imgUrl = imgEl.getAttribute('data-medium-image') || imgEl.getAttribute('href') || imgEl.getAttribute('data-thumb-image') || '';
+        }
+      }
+
+      if (imgUrl.startsWith('//')) {
+        imgUrl = 'https:' + imgUrl;
+      } else if (imgUrl && !imgUrl.startsWith('http')) {
+        imgUrl = 'https://www.nalburdayim.com' + (imgUrl.startsWith('/') ? '' : '/') + imgUrl;
+      }
+
+      return { key, name, basePrice, domain, imgUrl, unit: 'ADET', packQuantity: 1 };
+    }
+  },
+  SITE_F: {
+    name: "Fırat Boru",
+    badgeClass: "site_f",
+    rowSelector: null,
+    parseRow: null
+  },
   SITE_E: {
     name: "Akyüzler",
     badgeClass: "site_e",
@@ -270,6 +313,8 @@ export async function checkAllSessions() {
     isAkyuzActive ? 'success' : 'idle',
     isAkyuzActive ? 'Aktif' : 'Pasif'
   );
+
+  updateStatusIndicator('SITE_G', 'success', 'Aktif');
 }
 
 // --- UZAKTAN GÜNCELLEME KONTROLÜ ---
@@ -331,6 +376,7 @@ export async function executeSearch() {
   }
 
   state.currentResults = [];
+  state.selectedFilterSite = 'ALL';
   imageFetchQueue = [];
   const resultsContainer = document.getElementById('comparison-results');
   resultsContainer.innerHTML = `
@@ -362,6 +408,9 @@ export async function executeSearch() {
 
   if (document.getElementById('site-f-check').checked) activeSites.push('SITE_F');
   else updateStatusIndicator('SITE_F', 'idle', 'Devre Dışı');
+
+  if (document.getElementById('site-g-check').checked) activeSites.push('SITE_G');
+  else updateStatusIndicator('SITE_G', 'idle', 'Devre Dışı');
 
   if (activeSites.length === 0) {
     resultsContainer.innerHTML = `
@@ -1131,10 +1180,72 @@ export async function fetchFromB2B(siteKey, query) {
   }
 }
 
+// Dinamik filtre butonlarını çizen fonksiyon
+export function renderFilterButtons() {
+  const container = document.getElementById('site-filters-container');
+  if (!container) return;
+
+  if (state.currentResults.length === 0) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+
+  // Benzersiz kaynakları ve ürün adetlerini sayalım
+  const counts = {};
+  state.currentResults.forEach(p => {
+    if (p.sourceKey) {
+      counts[p.sourceKey] = (counts[p.sourceKey] || 0) + 1;
+    }
+  });
+
+  const activeSourceKeys = Object.keys(counts);
+
+  container.innerHTML = '';
+  container.style.display = 'flex';
+
+  // "Hepsi" butonu
+  const allBtn = document.createElement('button');
+  const isAllActive = !state.selectedFilterSite || state.selectedFilterSite === 'ALL';
+  allBtn.className = `filter-btn ${isAllActive ? 'active' : ''}`;
+  allBtn.innerHTML = `
+    <span class="site-dot site_all"></span>
+    Hepsi
+    <span class="filter-count">${state.currentResults.length}</span>
+  `;
+  allBtn.addEventListener('click', () => {
+    state.selectedFilterSite = 'ALL';
+    renderResults();
+  });
+  container.appendChild(allBtn);
+
+  // Her bir site için filtre butonu
+  activeSourceKeys.forEach(siteKey => {
+    const siteName = PARSERS[siteKey]?.name || siteKey;
+    const isSiteActive = state.selectedFilterSite === siteKey;
+    const btn = document.createElement('button');
+    btn.className = `filter-btn ${isSiteActive ? 'active' : ''}`;
+    const letter = siteKey.replace('SITE_', '').toLowerCase();
+    btn.innerHTML = `
+      <span class="site-dot site_${letter}"></span>
+      ${siteName}
+      <span class="filter-count">${counts[siteKey]}</span>
+    `;
+    btn.addEventListener('click', () => {
+      state.selectedFilterSite = siteKey;
+      renderResults();
+    });
+    container.appendChild(btn);
+  });
+}
+
 // Sonuçları Ekrana Çizme
 export function renderResults() {
   const container = document.getElementById('comparison-results');
   if (!container) return;
+
+  // Dinamik filtre butonlarını çizelim
+  renderFilterButtons();
 
   if (state.currentResults.length === 0) {
     container.innerHTML = `
@@ -1151,10 +1262,36 @@ export function renderResults() {
     return;
   }
 
-  document.getElementById('results-count').textContent = `${state.currentResults.length} adet ürün listelendi.`;
+  // Filtreleme mantığı
+  let filtered = state.currentResults;
+  if (state.selectedFilterSite && state.selectedFilterSite !== 'ALL') {
+    filtered = state.currentResults.filter(p => p.sourceKey === state.selectedFilterSite);
+  }
+
+  // Listelenen adet yazısı
+  if (state.selectedFilterSite && state.selectedFilterSite !== 'ALL') {
+    const siteName = PARSERS[state.selectedFilterSite]?.name || state.selectedFilterSite;
+    document.getElementById('results-count').textContent = `${filtered.length} / ${state.currentResults.length} ürün listelendi (${siteName})`;
+  } else {
+    document.getElementById('results-count').textContent = `${state.currentResults.length} adet ürün listelendi.`;
+  }
+
   container.innerHTML = '';
 
-  state.currentResults.forEach((product) => {
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <tr>
+        <td colspan="7" class="empty-state">
+          <div class="empty-state-content">
+            <p>Bu siteye ait filtrelenmiş ürün bulunamadı.</p>
+          </div>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  filtered.forEach((product) => {
     const discInfo = calculateTotalDiscountForProduct(product.name, product.key, product.sourceKey);
 
     const purchaseNoVat = product.basePrice;

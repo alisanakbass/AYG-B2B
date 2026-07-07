@@ -1,7 +1,7 @@
 import { state, DEFAULT_URLS } from './modules/state.js';
 import { formatPrice, getSourceKeyFromDomain, calculateSellingPrice } from './modules/utils.js';
 import { initDiscounts, calculateTotalDiscountForProduct, renderKeywordDiscountRules, renderProductDiscountRules, reapplyAllDiscounts } from './modules/discounts.js';
-import { renderCart, renderReports, confirmCart, submitCart, clearSalesHistory } from './modules/cart.js';
+import { renderCart, renderReports, confirmCart, submitCart, salesHistoryPageIndex, setSalesHistoryPageIndex, salesFilters } from './modules/cart.js';
 import { loadFiratStats, loadDefaultExcelIfEmpty, setupExcelListeners } from './modules/excel.js';
 import { checkUpdates, checkAllSessions, executeSearch, recalculateAllResults, applySorting, renderResults, updateBulkDiscountBarVisibility } from './modules/search.js';
 
@@ -70,6 +70,7 @@ async function loadSettings() {
       margin_site_e: 40,
       margin_site_f: 40,
       margin_site_g: 40,
+      margin_site_h: 40,
       discount_site_a: 0,
       discount_site_b: 0,
       discount_site_c: 0,
@@ -77,12 +78,14 @@ async function loadSettings() {
       discount_site_e: 0,
       discount_site_f: 0,
       discount_site_g: 0,
+      discount_site_h: 0,
       url_site_a: DEFAULT_URLS.url_site_a,
       url_site_b: DEFAULT_URLS.url_site_b,
       url_site_c: DEFAULT_URLS.url_site_c,
       url_site_d: DEFAULT_URLS.url_site_d,
       url_site_e: DEFAULT_URLS.url_site_e,
       url_site_g: DEFAULT_URLS.url_site_g,
+      url_site_h: DEFAULT_URLS.url_site_h,
       productDiscounts: {},
       keywordDiscounts: [],
       cred_user_site_a: "info@aygunleryapi.com",
@@ -95,8 +98,16 @@ async function loadSettings() {
       cred_user_site_d: "17183",
       cred_pass_site_d: "27f4e5d",
       cred_user_site_g: "",
-      cred_pass_site_g: ""
+      cred_pass_site_g: "",
+      cred_user_site_h: "1340631",
+      cred_pass_site_h: "662732"
     }, (items) => {
+      // Eğer kullanıcıda eski/yanlış arama şablonu kayıtlıysa otomatik olarak AJAX (API) adresi ile değiştirelim
+      if (items.url_site_h === "https://b2b.kamilturk.com/Arama/Arama?q={query}" || !items.url_site_h) {
+        items.url_site_h = DEFAULT_URLS.url_site_h;
+        chrome.storage.sync.set({ url_site_h: DEFAULT_URLS.url_site_h });
+      }
+
       state.currentMargin = items.margin;
       state.siteMargins = {
         SITE_A: items.margin_site_a,
@@ -105,7 +116,8 @@ async function loadSettings() {
         SITE_D: items.margin_site_d,
         SITE_E: items.margin_site_e,
         SITE_F: items.margin_site_f,
-        SITE_G: items.margin_site_g
+        SITE_G: items.margin_site_g,
+        SITE_H: items.margin_site_h
       };
       state.siteDiscounts = {
         SITE_A: items.discount_site_a,
@@ -114,7 +126,8 @@ async function loadSettings() {
         SITE_D: items.discount_site_d,
         SITE_E: items.discount_site_e,
         SITE_F: items.discount_site_f,
-        SITE_G: items.discount_site_g
+        SITE_G: items.discount_site_g,
+        SITE_H: items.discount_site_h
       };
       state.currentProductDiscounts = items.productDiscounts || {};
       state.keywordDiscounts = items.keywordDiscounts || [];
@@ -122,7 +135,7 @@ async function loadSettings() {
       const modalMargin = document.getElementById('modal-margin');
       if (modalMargin) modalMargin.value = items.margin;
 
-      ['a', 'b', 'c', 'd', 'e', 'f', 'g'].forEach(letter => {
+      ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].forEach(letter => {
         const key = `SITE_${letter.toUpperCase()}`;
         const mInput = document.getElementById(`margin-site-${letter}`);
         const dInput = document.getElementById(`discount-site-${letter}`);
@@ -136,12 +149,14 @@ async function loadSettings() {
       const modalUrlD = document.getElementById('modal-url-site-d');
       const modalUrlE = document.getElementById('modal-url-site-e');
       const modalUrlG = document.getElementById('modal-url-site-g');
+      const modalUrlH = document.getElementById('modal-url-site-h');
       if (modalUrlA) modalUrlA.value = items.url_site_a;
       if (modalUrlB) modalUrlB.value = items.url_site_b;
       if (modalUrlC) modalUrlC.value = items.url_site_c;
       if (modalUrlD) modalUrlD.value = items.url_site_d;
       if (modalUrlE) modalUrlE.value = items.url_site_e;
       if (modalUrlG) modalUrlG.value = items.url_site_g;
+      if (modalUrlH) modalUrlH.value = items.url_site_h;
 
       // Giriş Bilgilerini Doldur
       const cUserA = document.getElementById('cred-user-site-a');
@@ -155,6 +170,8 @@ async function loadSettings() {
       const cPassD = document.getElementById('cred-pass-site-d');
       const cUserG = document.getElementById('cred-user-site-g');
       const cPassG = document.getElementById('cred-pass-site-g');
+      const cUserH = document.getElementById('cred-user-site-h');
+      const cPassH = document.getElementById('cred-pass-site-h');
 
       if (cUserA) cUserA.value = items.cred_user_site_a || "info@aygunleryapi.com";
       if (cPassA) cPassA.value = items.cred_pass_site_a || "FZ0DT1YL*0OE";
@@ -167,6 +184,8 @@ async function loadSettings() {
       if (cPassD) cPassD.value = items.cred_pass_site_d || "27f4e5d";
       if (cUserG) cUserG.value = items.cred_user_site_g || "";
       if (cPassG) cPassG.value = items.cred_pass_site_g || "";
+      if (cUserH) cUserH.value = items.cred_user_site_h || "1340631";
+      if (cPassH) cPassH.value = items.cred_pass_site_h || "662732";
 
       renderKeywordDiscountRules();
       renderProductDiscountRules();
@@ -232,7 +251,7 @@ function setupUIEventListeners() {
   });
 
   // Site Bazlı Kâr Marjı ve Genel İskonto Dinleyicileri
-  ['a', 'b', 'c', 'd', 'e', 'f', 'g'].forEach(letter => {
+  ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].forEach(letter => {
     const key = `SITE_${letter.toUpperCase()}`;
     const mInput = document.getElementById(`margin-site-${letter}`);
     const dInput = document.getElementById(`discount-site-${letter}`);
@@ -266,6 +285,7 @@ function setupUIEventListeners() {
     const urlD = document.getElementById('modal-url-site-d').value.trim();
     const urlE = document.getElementById('modal-url-site-e').value.trim();
     const urlG = document.getElementById('modal-url-site-g').value.trim();
+    const urlH = document.getElementById('modal-url-site-h').value.trim();
 
     chrome.storage.sync.set({
       url_site_a: urlA,
@@ -273,7 +293,8 @@ function setupUIEventListeners() {
       url_site_c: urlC,
       url_site_d: urlD,
       url_site_e: urlE,
-      url_site_g: urlG
+      url_site_g: urlG,
+      url_site_h: urlH
     }, () => {
       alert("URL şablonları başarıyla kaydedildi!");
       checkAllSessions();
@@ -318,6 +339,8 @@ function setupUIEventListeners() {
 
   // Teklif Ön İzleme ve İndirme Yönetimi
   let activeTeklifNo = "";
+  let activeOfferItems = null;
+  let activeSaleForOffer = null;
   const sidebarExportOfferBtn = document.getElementById('sidebar-export-offer-btn');
   const offerPreviewModal = document.getElementById('offer-preview-modal');
   const offerPreviewCloseBtn = document.getElementById('offer-preview-close-btn');
@@ -334,112 +357,118 @@ function setupUIEventListeners() {
     previewTbody: !!previewTbody
   });
 
+  // Genel Teklif Ön İzleme Açma Fonksiyonu
+  function openOfferPreview(items) {
+    try {
+      console.log("[B2B Teklif] Teklif önizleme açılıyor. Öğe sayısı:", items.length);
+      
+      if (items.length === 0) {
+        alert("Teklif oluşturabilmek için sepetinizde ürün bulunmalıdır.");
+        return;
+      }
+      
+      if (items.length > 100) {
+        alert("Teklif şablonu en fazla 100 ürün desteklemektedir. Lütfen sepetinizdeki ürün sayısını 100 veya daha az yapın.");
+        return;
+      }
+
+      // Tarih ve Teklif No üret
+      const bugun = new Date().toLocaleDateString('tr-TR');
+      activeTeklifNo = "AYG-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "-" + Math.floor(1000 + Math.random() * 9000);
+      console.log("[B2B Teklif] Üretilen Teklif No:", activeTeklifNo, "Tarih:", bugun);
+      
+      const previewNoEl = document.getElementById('preview-teklif-no');
+      const previewTarihEl = document.getElementById('preview-tarih');
+      
+      if (previewNoEl) previewNoEl.textContent = activeTeklifNo;
+      if (previewTarihEl) previewTarihEl.textContent = bugun;
+
+      // Düzenlenebilir alanları sıfırla
+      const editableIds = ['input-sayin', 'input-adres', 'input-sevk-adresi', 'input-telefon', 'input-fax', 'input-vergi-dairesi', 'input-vergi-no', 'input-sayin-sag'];
+      editableIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = "";
+      });
+
+      // Tabloyu temizle ve doldur
+      if (previewTbody) {
+        previewTbody.innerHTML = "";
+      } else {
+        throw new Error("preview-offer-items-tbody elementi bulunamadı!");
+      }
+      
+      let grandTotalNoVat = 0;
+      const totalRowsToRender = Math.max(22, items.length);
+
+      // Sepetteki veya verilen ürünleri ekle
+      for (let i = 0; i < totalRowsToRender; i++) {
+        const item = items[i];
+        
+        if (item) {
+          console.log(`[B2B Teklif] İşleniyor Satır ${i+1}:`, item.name);
+          const sourceKey = item.sourceKey || getSourceKeyFromDomain(item.domain);
+          const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
+          const margin = state.siteMargins[sourceKey] !== undefined ? state.siteMargins[sourceKey] : state.currentMargin;
+          
+          const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false);
+          const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
+          
+          const itemUnit = (item.unit || 'ADET').toUpperCase();
+          const itemPackQty = item.packQuantity || 1;
+          const multiplier = itemUnit === 'ADET' ? 1 : itemPackQty;
+          
+          const finalUnitPrice = unitPriceNoVat * multiplier;
+          const totalNoVat = finalUnitPrice * item.qty;
+          grandTotalNoVat += totalNoVat;
+
+          const tr = document.createElement('tr');
+          tr.style.borderBottom = "1px solid #000";
+          tr.innerHTML = `
+            <td style="border-right: 1px solid #000; padding: 6px; text-align: center;">${i + 1}</td>
+            <td style="border-right: 1px solid #000; padding: 6px; text-align: left; font-weight: 500;">${item.name}</td>
+            <td style="border-right: 1px solid #000; padding: 6px; text-align: center;">${itemUnit}</td>
+            <td style="border-right: 1px solid #000; padding: 6px; text-align: center;">${item.qty}</td>
+            <td style="border-right: 1px solid #000; padding: 6px; text-align: right;">${formatPrice(finalUnitPrice).replace(" TL", "")}</td>
+            <td style="padding: 6px; text-align: right;">${formatPrice(totalNoVat).replace(" TL", "")}</td>
+          `;
+          previewTbody.appendChild(tr);
+        } else {
+          // Boş satır ekle
+          const tr = document.createElement('tr');
+          tr.style.borderBottom = "1px solid #000";
+          tr.style.height = "25px";
+          tr.innerHTML = `
+            <td style="border-right: 1px solid #000; padding: 6px; text-align: center;">${i + 1}</td>
+            <td style="border-right: 1px solid #000; padding: 6px;"></td>
+            <td style="border-right: 1px solid #000; padding: 6px;"></td>
+            <td style="border-right: 1px solid #000; padding: 6px;"></td>
+            <td style="border-right: 1px solid #000; padding: 6px;"></td>
+            <td style="padding: 6px;"></td>
+          `;
+          previewTbody.appendChild(tr);
+        }
+      }
+
+      // Toplam değeri yaz
+      const totalValEl = document.getElementById('preview-offer-total-val');
+      if (totalValEl) totalValEl.textContent = formatPrice(grandTotalNoVat);
+
+      // Aktif ihraç edilecek listeyi kaydet
+      activeOfferItems = items;
+
+      // Modalı aç
+      offerPreviewModal.classList.add('open');
+      console.log("[B2B Teklif] Modal başarıyla açıldı.");
+    } catch (err) {
+      console.error("[B2B Teklif] Önizleme yüklenirken hata:", err);
+      alert("Ön izleme yüklenirken hata oluştu: " + err.message);
+    }
+  }
+
+  // Sidebar Teklif Buton Tıklaması
   if (sidebarExportOfferBtn && offerPreviewModal) {
     sidebarExportOfferBtn.addEventListener('click', () => {
-      console.log("[B2B Teklif] Teklif butonuna tıklandı.");
-      try {
-        const items = Object.values(state.currentCart);
-        console.log("[B2B Teklif] Sepet öğeleri sayısı:", items.length, items);
-        
-        if (items.length === 0) {
-          alert("Teklif oluşturabilmek için sepetinizde ürün bulunmalıdır.");
-          return;
-        }
-        
-        if (items.length > 100) {
-          alert("Teklif şablonu en fazla 100 ürün desteklemektedir. Lütfen sepetinizdeki ürün sayısını 100 veya daha az yapın.");
-          return;
-        }
-
-        // Tarih ve Teklif No üret
-        const bugun = new Date().toLocaleDateString('tr-TR');
-        activeTeklifNo = "AYG-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "-" + Math.floor(1000 + Math.random() * 9000);
-        console.log("[B2B Teklif] Üretilen Teklif No:", activeTeklifNo, "Tarih:", bugun);
-        
-        const previewNoEl = document.getElementById('preview-teklif-no');
-        const previewTarihEl = document.getElementById('preview-tarih');
-        
-        if (previewNoEl) previewNoEl.textContent = activeTeklifNo;
-        if (previewTarihEl) previewTarihEl.textContent = bugun;
-
-        // Düzenlenebilir alanları sıfırla
-        const editableIds = ['input-sayin', 'input-adres', 'input-sevk-adresi', 'input-telefon', 'input-fax', 'input-vergi-dairesi', 'input-vergi-no', 'input-sayin-sag'];
-        editableIds.forEach(id => {
-          const el = document.getElementById(id);
-          if (el) el.textContent = "";
-        });
-
-        // Tabloyu temizle ve doldur
-        if (previewTbody) {
-          previewTbody.innerHTML = "";
-        } else {
-          throw new Error("preview-offer-items-tbody elementi bulunamadı!");
-        }
-        
-        let grandTotalNoVat = 0;
-        const startRow = 18;
-        const totalRowsToRender = Math.max(22, items.length);
-
-        // Sepetteki ürünleri ekle
-        for (let i = 0; i < totalRowsToRender; i++) {
-          const item = items[i];
-          
-          if (item) {
-            console.log(`[B2B Teklif] İşleniyor Satır ${i+1}:`, item.name);
-            const sourceKey = item.sourceKey || getSourceKeyFromDomain(item.domain);
-            const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
-            const margin = state.siteMargins[sourceKey] !== undefined ? state.siteMargins[sourceKey] : state.currentMargin;
-            
-            const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false);
-            const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
-            
-            const itemUnit = (item.unit || 'ADET').toUpperCase();
-            const itemPackQty = item.packQuantity || 1;
-            const multiplier = itemUnit === 'ADET' ? 1 : itemPackQty;
-            
-            const finalUnitPrice = unitPriceNoVat * multiplier;
-            const totalNoVat = finalUnitPrice * item.qty;
-            grandTotalNoVat += totalNoVat;
-
-            const tr = document.createElement('tr');
-            tr.style.borderBottom = "1px solid #000";
-            tr.innerHTML = `
-              <td style="border-right: 1px solid #000; padding: 6px; text-align: center;">${i + 1}</td>
-              <td style="border-right: 1px solid #000; padding: 6px; text-align: left; font-weight: 500;">${item.name}</td>
-              <td style="border-right: 1px solid #000; padding: 6px; text-align: center;">${itemUnit}</td>
-              <td style="border-right: 1px solid #000; padding: 6px; text-align: center;">${item.qty}</td>
-              <td style="border-right: 1px solid #000; padding: 6px; text-align: right;">${formatPrice(finalUnitPrice).replace(" TL", "")}</td>
-              <td style="padding: 6px; text-align: right;">${formatPrice(totalNoVat).replace(" TL", "")}</td>
-            `;
-            previewTbody.appendChild(tr);
-          } else {
-            // Boş satır ekle (şablonu taklit etmek için)
-            const tr = document.createElement('tr');
-            tr.style.borderBottom = "1px solid #000";
-            tr.style.height = "25px";
-            tr.innerHTML = `
-              <td style="border-right: 1px solid #000; padding: 6px; text-align: center;">${i + 1}</td>
-              <td style="border-right: 1px solid #000; padding: 6px;"></td>
-              <td style="border-right: 1px solid #000; padding: 6px;"></td>
-              <td style="border-right: 1px solid #000; padding: 6px;"></td>
-              <td style="border-right: 1px solid #000; padding: 6px;"></td>
-              <td style="padding: 6px;"></td>
-            `;
-            previewTbody.appendChild(tr);
-          }
-        }
-
-        // Toplam değeri yaz
-        const totalValEl = document.getElementById('preview-offer-total-val');
-        if (totalValEl) totalValEl.textContent = formatPrice(grandTotalNoVat);
-
-        // Modalı aç
-        offerPreviewModal.classList.add('open');
-        console.log("[B2B Teklif] Modal başarıyla açıldı.");
-      } catch (err) {
-        console.error("[B2B Teklif] Tıklama dinleyicisinde hata:", err);
-        alert("Ön izleme yüklenirken hata oluştu: " + err.message);
-      }
+      openOfferPreview(Object.values(state.currentCart));
     });
   } else {
     console.error("[B2B Teklif] sidebarExportOfferBtn veya offerPreviewModal DOM'da bulunamadı!");
@@ -483,7 +512,7 @@ function setupUIEventListeners() {
         };
 
         const { exportCartAsExcelOffer } = await import('./modules/excel.js');
-        await exportCartAsExcelOffer(activeTeklifNo, metadata);
+        await exportCartAsExcelOffer(activeTeklifNo, metadata, activeOfferItems);
 
         offerPreviewDownloadBtn.innerHTML = originalText;
         offerPreviewDownloadBtn.disabled = false;
@@ -493,6 +522,126 @@ function setupUIEventListeners() {
         alert("Excel oluşturulurken bir hata oluştu: " + err.message);
         offerPreviewDownloadBtn.innerHTML = "Excel Olarak İndir";
         offerPreviewDownloadBtn.disabled = false;
+      }
+    });
+  }
+
+  // --- SATIŞ SEPETİ DETAY VE TEKLİF DÖNÜŞÜM MODALI ---
+  const saleDetailModal = document.getElementById('sale-detail-modal');
+  const closeSaleDetailModalBtn = document.getElementById('close-sale-detail-modal-btn');
+  const saleDetailCancelBtn = document.getElementById('sale-detail-cancel-btn');
+  const saleDetailToOfferBtn = document.getElementById('sale-detail-to-offer-btn');
+  const salesHistoryRows = document.getElementById('sales-history-rows');
+
+  // Satış Detaylarını Gösteren Fonksiyon
+  function showSaleDetails(saleId) {
+    const sale = state.salesHistory.find(s => s.id === saleId);
+    if (!sale) {
+      alert("Satış kaydı bulunamadı!");
+      return;
+    }
+
+    const dateStr = new Date(sale.timestamp).toLocaleString('tr-TR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    
+    const detailDateEl = document.getElementById('sale-detail-date');
+    const detailIdEl = document.getElementById('sale-detail-id');
+    if (detailDateEl) detailDateEl.textContent = dateStr;
+    if (detailIdEl) detailIdEl.textContent = sale.id;
+
+    const tbody = document.getElementById('sale-detail-modal-items-tbody');
+    if (tbody) {
+      tbody.innerHTML = '';
+      sale.items.forEach(item => {
+        const sourceKey = item.sourceKey || getSourceKeyFromDomain(item.domain);
+        const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
+        const margin = state.siteMargins[sourceKey] !== undefined ? state.siteMargins[sourceKey] : state.currentMargin;
+        
+        const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false);
+        const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
+        
+        const rawUnitPriceWithVat = calculateSellingPrice(item.basePrice, margin, true);
+        const unitPriceWithVat = rawUnitPriceWithVat * (1 - discInfo.discount / 100);
+
+        const itemUnit = (item.unit || 'ADET').toUpperCase();
+        const itemPackQty = item.packQuantity || 1;
+        const multiplier = itemUnit === 'ADET' ? 1 : itemPackQty;
+
+        const finalUnitPriceNoVat = unitPriceNoVat * multiplier;
+        const finalUnitPriceWithVat = unitPriceWithVat * multiplier;
+        const totalNoVat = finalUnitPriceNoVat * item.qty;
+        const totalWithVat = finalUnitPriceWithVat * item.qty;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="padding: 10px; text-align: left; font-weight: 500;">${item.name}</td>
+          <td style="padding: 10px; text-align: left;">${item.domain.replace('www.', '')}</td>
+          <td style="padding: 10px; text-align: center;">${item.qty} ${itemUnit}</td>
+          <td style="padding: 10px; text-align: right;">
+            <div>${formatPrice(finalUnitPriceWithVat)}</div>
+            <span style="font-size: 10px; color: var(--text-muted);">KDV'siz: ${formatPrice(finalUnitPriceNoVat)}</span>
+          </td>
+          <td style="padding: 10px; text-align: right; font-weight: 600;">
+            <div>${formatPrice(totalWithVat)}</div>
+            <span style="font-size: 10px; color: var(--text-muted);">KDV'siz: ${formatPrice(totalNoVat)}</span>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    const saleSalesNoVat = sale.totalSalesNoVat !== undefined ? sale.totalSalesNoVat : sale.totalSales / 1.20;
+    const saleSalesWithVat = sale.totalSalesWithVat !== undefined ? sale.totalSalesWithVat : sale.totalSales;
+    const saleProfitWithVat = sale.totalProfitWithVat !== undefined ? sale.totalProfitWithVat : sale.totalProfit;
+
+    const noVatEl = document.getElementById('sale-detail-sales-no-vat');
+    const withVatEl = document.getElementById('sale-detail-sales-with-vat');
+    const profitEl = document.getElementById('sale-detail-profit-with-vat');
+
+    if (noVatEl) noVatEl.textContent = formatPrice(saleSalesNoVat);
+    if (withVatEl) withVatEl.textContent = formatPrice(saleSalesWithVat);
+    if (profitEl) profitEl.textContent = formatPrice(saleProfitWithVat);
+
+    activeSaleForOffer = sale;
+
+    if (saleDetailModal) saleDetailModal.classList.add('open');
+  }
+
+  // Satış Detay Modalı Kapatma
+  const closeSaleDetailModal = () => {
+    if (saleDetailModal) saleDetailModal.classList.remove('open');
+  };
+
+  if (closeSaleDetailModalBtn) closeSaleDetailModalBtn.addEventListener('click', closeSaleDetailModal);
+  if (saleDetailCancelBtn) saleDetailCancelBtn.addEventListener('click', closeSaleDetailModal);
+  if (saleDetailModal) {
+    saleDetailModal.addEventListener('click', (e) => {
+      if (e.target === saleDetailModal) closeSaleDetailModal();
+    });
+  }
+
+  // Satış Detayından Teklife Dönüştürme Tıklaması
+  if (saleDetailToOfferBtn) {
+    saleDetailToOfferBtn.addEventListener('click', () => {
+      if (activeSaleForOffer) {
+        closeSaleDetailModal();
+        openOfferPreview(activeSaleForOffer.items);
+      }
+    });
+  }
+
+  // Satış Geçmişi Tablosundan "Detay" Butonu Delegasyonu
+  if (salesHistoryRows) {
+    salesHistoryRows.addEventListener('click', (e) => {
+      const viewBtn = e.target.closest('.view-sale-btn');
+      if (viewBtn) {
+        const id = viewBtn.getAttribute('data-id');
+        showSaleDetails(id);
       }
     });
   }
@@ -674,10 +823,41 @@ function setupUIEventListeners() {
     });
   }
 
-  // Rapor geçmişini temizle
-  const clearHistoryBtn = document.getElementById('clear-history-btn');
-  if (clearHistoryBtn) {
-    clearHistoryBtn.addEventListener('click', clearSalesHistory);
+  // Satış Geçmişi Filtreleri
+  const salesFilterSearch = document.getElementById('sales-filter-search');
+  const salesFilterStartDate = document.getElementById('sales-filter-start-date');
+  const salesFilterEndDate = document.getElementById('sales-filter-end-date');
+
+  const onSalesFilterChange = () => {
+    salesFilters.search = salesFilterSearch ? salesFilterSearch.value : '';
+    salesFilters.startDate = salesFilterStartDate ? salesFilterStartDate.value : '';
+    salesFilters.endDate = salesFilterEndDate ? salesFilterEndDate.value : '';
+    setSalesHistoryPageIndex(0); // Reset page to newest
+    renderReports();
+  };
+
+  if (salesFilterSearch) salesFilterSearch.addEventListener('input', onSalesFilterChange);
+  if (salesFilterStartDate) salesFilterStartDate.addEventListener('change', onSalesFilterChange);
+  if (salesFilterEndDate) salesFilterEndDate.addEventListener('change', onSalesFilterChange);
+
+  // Satış Geçmişi Sayfalama
+  const salesHistoryPrevDayBtn = document.getElementById('sales-history-prev-day-btn');
+  const salesHistoryNextDayBtn = document.getElementById('sales-history-next-day-btn');
+
+  if (salesHistoryPrevDayBtn) {
+    salesHistoryPrevDayBtn.addEventListener('click', () => {
+      if (salesHistoryPageIndex > 0) {
+        setSalesHistoryPageIndex(salesHistoryPageIndex - 1);
+        renderReports();
+      }
+    });
+  }
+
+  if (salesHistoryNextDayBtn) {
+    salesHistoryNextDayBtn.addEventListener('click', () => {
+      setSalesHistoryPageIndex(salesHistoryPageIndex + 1);
+      renderReports();
+    });
   }
 
   // Manuel "Bağlan" butonları dinleyicileri
@@ -718,6 +898,8 @@ function setupUIEventListeners() {
       const passD = document.getElementById('cred-pass-site-d').value.trim();
       const userG = document.getElementById('cred-user-site-g').value.trim();
       const passG = document.getElementById('cred-pass-site-g').value.trim();
+      const userH = document.getElementById('cred-user-site-h').value.trim();
+      const passH = document.getElementById('cred-pass-site-h').value.trim();
 
       chrome.storage.sync.set({
         cred_user_site_a: userA,
@@ -730,7 +912,9 @@ function setupUIEventListeners() {
         cred_user_site_d: userD,
         cred_pass_site_d: passD,
         cred_user_site_g: userG,
-        cred_pass_site_g: passG
+        cred_pass_site_g: passG,
+        cred_user_site_h: userH,
+        cred_pass_site_h: passH
       }, () => {
         alert("B2B giriş bilgileri başarıyla kaydedildi!");
       });

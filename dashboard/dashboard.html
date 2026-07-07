@@ -114,7 +114,7 @@
           </button>
         </nav>
 
-        <section class="sidebar-section">
+        <section class="sidebar-section sidebar-section-sites">
           <h2>B2B Siteleri</h2>
           <div
             class="exchange-rates-panel"
@@ -338,6 +338,35 @@
                   <span>Bağlan</span>
                 </button>
                 <span class="status-indicator loading" id="site-g-status"
+                  >Kontrol Ediliyor...</span
+                >
+              </div>
+            </div>
+            <div class="site-item" data-site="SITE_H">
+              <label class="site-checkbox-label">
+                <input type="checkbox" id="site-h-check" checked />
+                <span class="site-name" style="color: #818cf8">Kamil Türk B2B</span>
+              </label>
+              <div class="site-status-row">
+                <button
+                  class="connect-btn"
+                  data-site="SITE_H"
+                  title="Bağlan / Giriş Yap"
+                >
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                  >
+                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                    <line x1="12" y1="2" x2="12" y2="12"></line>
+                  </svg>
+                  <span>Bağlan</span>
+                </button>
+                <span class="status-indicator loading" id="site-h-status"
                   >Kontrol Ediliyor...</span
                 >
               </div>
@@ -1123,6 +1152,52 @@
                             />
                           </td>
                         </tr>
+                        <tr>
+                          <td
+                            style="
+                              padding: 10px;
+                              font-weight: 500;
+                              color: #818cf8;
+                            "
+                          >
+                            Kamil Türk B2B
+                          </td>
+                          <td style="padding: 10px; text-align: center">
+                            <input
+                              type="number"
+                              id="margin-site-h"
+                              style="
+                                width: 80px;
+                                padding: 6px;
+                                text-align: center;
+                                background: var(--bg-input);
+                                border: 1px solid var(--border);
+                                border-radius: 6px;
+                                color: var(--text);
+                              "
+                              min="0"
+                              value="40"
+                            />
+                          </td>
+                          <td style="padding: 10px; text-align: center">
+                            <input
+                              type="number"
+                              id="discount-site-h"
+                              style="
+                                width: 80px;
+                                padding: 6px;
+                                text-align: center;
+                                background: var(--bg-input);
+                                border: 1px solid var(--border);
+                                border-radius: 6px;
+                                color: var(--text);
+                              "
+                              min="0"
+                              max="100"
+                              value="0"
+                            />
+                          </td>
+                        </tr>
                       </tbody>
                     </table>
                   </div>
@@ -1571,6 +1646,10 @@
                 <label for="modal-url-site-g">Nalburdayım Arama URL</label>
                 <input type="text" id="modal-url-site-g" value="" />
               </div>
+              <div class="input-wrapper">
+                <label for="modal-url-site-h">Kamil Türk B2B Arama URL</label>
+                <input type="text" id="modal-url-site-h" value="" />
+              </div>
               <div class="cart-action-buttons" style="margin-top: 15px">
                 <button id="modal-save-urls-btn" class="primary-btn flex-btn">
                   Kaydet
@@ -1791,6 +1870,46 @@
                 </div>
               </div>
 
+              <div
+                class="settings-group-title"
+                style="
+                  font-size: 12px;
+                  font-weight: 600;
+                  text-transform: uppercase;
+                  color: var(--text-muted);
+                  margin-bottom: 10px;
+                  margin-top: 15px;
+                "
+              >
+                Kamil Türk B2B
+              </div>
+              <div
+                class="settings-group"
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 8px;
+                  margin-bottom: 15px;
+                "
+              >
+                <div class="input-wrapper">
+                  <label for="cred-user-site-h">Kullanıcı Adı</label>
+                  <input
+                    type="text"
+                    id="cred-user-site-h"
+                    placeholder="Müşteri kodu veya kullanıcı adı..."
+                  />
+                </div>
+                <div class="input-wrapper">
+                  <label for="cred-pass-site-h">Şifre</label>
+                  <input
+                    type="password"
+                    id="cred-pass-site-h"
+                    placeholder="Şifre..."
+                  />
+                </div>
+              </div>
+
               <div class="cart-action-buttons" style="margin-top: 15px">
                 <button
                   id="modal-save-creds-btn"
@@ -1855,6 +1974,57 @@
                 >
                   Onaylanmış Satış Geçmişi
                 </h3>
+                <div class="sales-filters-row" style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                  <input
+                    type="text"
+                    id="sales-filter-search"
+                    placeholder="Ürün adı ile ara..."
+                    style="
+                      flex: 1.5;
+                      min-width: 150px;
+                      padding: 8px 12px;
+                      background: var(--bg-input);
+                      border: 1px solid var(--border);
+                      border-radius: 8px;
+                      font-family: var(--font);
+                      font-size: 13px;
+                      color: var(--text);
+                    "
+                  />
+                  <div style="display: flex; gap: 6px; align-items: center; flex: 2; min-width: 250px;">
+                    <input
+                      type="date"
+                      id="sales-filter-start-date"
+                      title="Başlangıç Tarihi"
+                      style="
+                        flex: 1;
+                        padding: 8px;
+                        background: var(--bg-input);
+                        border: 1px solid var(--border);
+                        border-radius: 8px;
+                        font-family: var(--font);
+                        font-size: 13px;
+                        color: var(--text);
+                      "
+                    />
+                    <span style="color: var(--text-muted); font-size: 12px;">-</span>
+                    <input
+                      type="date"
+                      id="sales-filter-end-date"
+                      title="Bitiş Tarihi"
+                      style="
+                        flex: 1;
+                        padding: 8px;
+                        background: var(--bg-input);
+                        border: 1px solid var(--border);
+                        border-radius: 8px;
+                        font-family: var(--font);
+                        font-size: 13px;
+                        color: var(--text);
+                      "
+                    />
+                  </div>
+                </div>
                 <div class="history-table-wrapper">
                   <table class="history-table">
                     <thead>
@@ -1883,18 +2053,40 @@
                     </tbody>
                   </table>
                 </div>
-                <button
-                  id="clear-history-btn"
-                  class="danger-btn"
+                <div
+                  id="sales-history-pagination"
                   style="
-                    margin-top: 12px;
-                    width: 100%;
-                    padding: 10px;
-                    font-size: 12px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-top: 15px;
+                    padding: 10px 15px;
+                    background: var(--bg-input);
+                    border: 1px solid var(--border);
+                    border-radius: 8px;
                   "
                 >
-                  Geçmişi Tamamen Temizle
-                </button>
+                  <button
+                    id="sales-history-prev-day-btn"
+                    class="secondary-btn"
+                    style="padding: 6px 12px; font-size: 12px; display: flex; align-items: center; gap: 4px;"
+                  >
+                    <span>&larr;</span> <span>Yeni Gün</span>
+                  </button>
+                  <span
+                    id="sales-history-current-day-label"
+                    style="font-size: 13px; font-weight: 600; color: var(--text);"
+                  >
+                    -
+                  </span>
+                  <button
+                    id="sales-history-next-day-btn"
+                    class="secondary-btn"
+                    style="padding: 6px 12px; font-size: 12px; display: flex; align-items: center; gap: 4px;"
+                  >
+                    <span>Eski Gün</span> <span>&rarr;</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -2452,6 +2644,186 @@
       </div>
     </div>
     <div id="drawer-overlay" class="drawer-overlay"></div>
+
+    <!-- Satış Sepet Detay Modalı -->
+    <div id="sale-detail-modal" class="modal-overlay">
+      <div class="modal-container" style="width: 750px; max-width: 95%">
+        <div
+          class="modal-header"
+          style="
+            border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+            background: linear-gradient(
+              135deg,
+              rgba(99, 102, 241, 0.02) 0%,
+              rgba(255, 255, 255, 1) 100%
+            );
+          "
+        >
+          <h2
+            style="color: var(--primary); display: flex; align-items: center; gap: 8px"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
+              <circle cx="9" cy="21" r="1"></circle>
+              <circle cx="20" cy="21" r="1"></circle>
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+            </svg>
+            <span>Satış Sepeti Detayı</span>
+          </h2>
+          <button id="close-sale-detail-modal-btn" class="close-btn">
+            &times;
+          </button>
+        </div>
+        <div class="modal-body" style="padding: 20px">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 13px; color: var(--text-muted);">
+            <div><b>Satış Tarihi:</b> <span id="sale-detail-date">-</span></div>
+            <div><b>Satış ID:</b> <span id="sale-detail-id">-</span></div>
+          </div>
+
+          <div
+            class="history-table-wrapper"
+            style="
+              max-height: 300px;
+              margin-bottom: 20px;
+              border: 1px solid var(--border);
+              border-radius: 8px;
+            "
+          >
+            <table
+              class="history-table"
+              style="font-size: 12px; border-collapse: collapse; width: 100%"
+            >
+              <thead>
+                <tr style="background: var(--bg-input)">
+                  <th style="padding: 10px; text-align: left">Ürün Adı</th>
+                  <th style="padding: 10px; text-align: left; width: 18%">Kaynak</th>
+                  <th style="padding: 10px; text-align: center; width: 12%">Miktar</th>
+                  <th style="padding: 10px; text-align: right; width: 18%">Birim Fiyat</th>
+                  <th style="padding: 10px; text-align: right; width: 18%">Toplam Fiyat</th>
+                </tr>
+              </thead>
+              <tbody id="sale-detail-modal-items-tbody"></tbody>
+            </table>
+          </div>
+
+          <div
+            class="stats-summary-grid"
+            style="
+              grid-template-columns: repeat(3, 1fr);
+              gap: 12px;
+              margin-top: 15px;
+            "
+          >
+            <div
+              class="stat-card"
+              style="
+                padding: 12px;
+                background: rgba(9, 13, 22, 0.02);
+                border: 1px solid var(--border);
+              "
+            >
+              <span class="stat-label" style="font-size: 11px"
+                >KDV'siz Satış Toplamı</span
+              >
+              <span
+                class="stat-value"
+                id="sale-detail-sales-no-vat"
+                style="font-size: 16px; color: var(--text); font-weight: 700"
+                >0,00 TL</span
+              >
+            </div>
+            <div
+              class="stat-card"
+              style="
+                padding: 12px;
+                background: rgba(9, 13, 22, 0.02);
+                border: 1px solid var(--border);
+              "
+            >
+              <span class="stat-label" style="font-size: 11px"
+                >KDV'li Satış Toplamı</span
+              >
+              <span
+                class="stat-value"
+                id="sale-detail-sales-with-vat"
+                style="font-size: 16px; color: var(--text); font-weight: 700"
+                >0,00 TL</span
+              >
+            </div>
+            <div
+              class="stat-card"
+              style="
+                padding: 12px;
+                background: rgba(5, 150, 105, 0.05);
+                border: 1px solid rgba(5, 150, 105, 0.15);
+              "
+            >
+              <span class="stat-label" style="font-size: 11px; color: #059669"
+                >Net Kâr (KDV'li)</span
+              >
+              <span
+                class="stat-value"
+                id="sale-detail-profit-with-vat"
+                style="font-size: 18px; color: #059669; font-weight: 700"
+                >0,00 TL</span
+              >
+            </div>
+          </div>
+        </div>
+        <div
+          class="modal-footer"
+          style="
+            padding: 15px 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            background: rgba(9, 13, 22, 0.01);
+          "
+        >
+          <button
+            id="sale-detail-cancel-btn"
+            class="secondary-btn flex-btn"
+            style="padding: 10px 16px; font-size: 13px"
+          >
+            Kapat
+          </button>
+          <button
+            id="sale-detail-to-offer-btn"
+            class="primary-btn flex-btn"
+            style="
+              padding: 10px 20px;
+              font-size: 13px;
+              display: flex;
+              align-items: center;
+              gap: 6px;
+            "
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            <span>Teklife Dönüştür</span>
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Teklif Ön İzleme Modalı -->
     <div id="offer-preview-modal" class="modal-overlay">

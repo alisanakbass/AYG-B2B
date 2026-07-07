@@ -2,8 +2,8 @@
 
 export const state = {
   currentMargin: 40,
-  siteMargins: { SITE_A: 40, SITE_B: 40, SITE_C: 40, SITE_D: 40, SITE_E: 40, SITE_F: 40, SITE_G: 40 },
-  siteDiscounts: { SITE_A: 0, SITE_B: 0, SITE_C: 0, SITE_D: 0, SITE_E: 0, SITE_F: 0, SITE_G: 0 },
+  siteMargins: { SITE_A: 40, SITE_B: 40, SITE_C: 40, SITE_D: 40, SITE_E: 40, SITE_F: 40, SITE_G: 40, SITE_H: 40 },
+  siteDiscounts: { SITE_A: 0, SITE_B: 0, SITE_C: 0, SITE_D: 0, SITE_E: 0, SITE_F: 0, SITE_G: 0, SITE_H: 0 },
   currentCart: {},
   drawerTimeout: null, // Sepet çekmecesi otomatik kapanma zamanlayıcısı
   currentResults: [], // Arama sonuçlarını hafızada tutar
@@ -25,7 +25,8 @@ export const DEFAULT_URLS = {
   url_site_c: "https://bayi.yasarteknik.com.tr/YeniSiparisGir.asp?F=Ara&FAdi={query}",
   url_site_d: "https://yenibayi.polisankansai.com/order/makeordernew?search={query}",
   url_site_e: "https://bayi.akyuztools.com/Search/SearchProduct",
-  url_site_g: "https://www.nalburdayim.com/search/?q={query}"
+  url_site_g: "https://www.nalburdayim.com/search/?q={query}",
+  url_site_h: "https://b2b.kamilturk.com/Arama/_Prbx?q={query}"
 };
 
 // Fırat Boru Görsel Eşleştirme Listesi

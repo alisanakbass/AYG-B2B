@@ -50,6 +50,38 @@ export const PARSERS = {
     rowSelector: null,
     parseRow: null
   },
+  SITE_H: {
+    name: "Kamil Türk B2B",
+    badgeClass: "site_h",
+    rowSelector: '.prbx-item',
+    parseRow: (row, domain) => {
+      const nameEl = row.querySelector('.prbx-ad');
+      if (!nameEl) return null;
+      const name = nameEl.textContent.trim();
+
+      const priceBox = Array.from(row.querySelectorAll('.fiyat-box-item')).find(el => el.textContent.includes('Net Fiyat'));
+      if (!priceBox) return null;
+      
+      const spans = priceBox.querySelectorAll('span');
+      if (spans.length < 3) return null;
+      const basePrice = parsePrice(spans[2].textContent);
+
+      const codeId = nameEl.getAttribute('id') || '';
+      const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
+      const key = `b2b_${domain.replace(/\./g, '_')}_${codeId || cleanName}`;
+
+      let imgUrl = '';
+      const imgEl = row.querySelector('.prbx-image img');
+      if (imgEl) {
+        imgUrl = imgEl.getAttribute('data-src') || imgEl.getAttribute('src') || '';
+      }
+      if (imgUrl && !imgUrl.startsWith('http')) {
+        imgUrl = 'https://b2b.kamilturk.com' + (imgUrl.startsWith('/') ? '' : '/') + imgUrl;
+      }
+
+      return { key, name, basePrice, domain, imgUrl, unit: 'ADET', packQuantity: 1 };
+    }
+  },
   SITE_E: {
     name: "Akyüzler",
     badgeClass: "site_e",
@@ -285,7 +317,7 @@ export const PARSERS = {
 // --- SESSION CHECKERS (Oturum Durum Kontrolleri) ---
 export async function checkAllSessions() {
   const storageData = await new Promise(r =>
-    chrome.storage.local.get(['enderyapi_token', 'akyuz_token', 'session_SITE_A', 'session_SITE_C', 'session_SITE_D', 'session_SITE_E'], r)
+    chrome.storage.local.get(['enderyapi_token', 'akyuz_token', 'session_SITE_A', 'session_SITE_C', 'session_SITE_D', 'session_SITE_E', 'session_SITE_H'], r)
   );
 
   updateStatusIndicator('SITE_A',
@@ -315,6 +347,11 @@ export async function checkAllSessions() {
   );
 
   updateStatusIndicator('SITE_G', 'success', 'Aktif');
+
+  updateStatusIndicator('SITE_H',
+    storageData.session_SITE_H ? 'success' : 'idle',
+    storageData.session_SITE_H ? 'Aktif' : 'Pasif'
+  );
 }
 
 // --- UZAKTAN GÜNCELLEME KONTROLÜ ---
@@ -411,6 +448,9 @@ export async function executeSearch() {
 
   if (document.getElementById('site-g-check').checked) activeSites.push('SITE_G');
   else updateStatusIndicator('SITE_G', 'idle', 'Devre Dışı');
+
+  if (document.getElementById('site-h-check').checked) activeSites.push('SITE_H');
+  else updateStatusIndicator('SITE_H', 'idle', 'Devre Dışı');
 
   if (activeSites.length === 0) {
     resultsContainer.innerHTML = `
@@ -1142,6 +1182,14 @@ export async function fetchFromB2B(siteKey, query) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(htmlText, 'text/html');
 
+    console.log(`[B2B Fetch Debug] Site: ${siteKey}, URL: ${searchUrl}`);
+    console.log(`[B2B Fetch Debug] HTML Uzunluğu: ${htmlText.length} karakter`);
+    console.log(`[B2B Fetch Debug] Giriş formu şifre alanı var mı: ${!!doc.querySelector('input[type="password"]')}`);
+    console.log(`[B2B Fetch Debug] Arama kutusu (#aranan) var mı: ${!!doc.getElementById('aranan')}`);
+    console.log(`[B2B Fetch Debug] Sayfada 'prbx-item' sayısı: ${doc.querySelectorAll('.prbx-item').length}`);
+    console.log(`[B2B Fetch Debug] Sayfada 'fiyat-box-item' sayısı: ${doc.querySelectorAll('.fiyat-box-item').length}`);
+    console.log(`[B2B Fetch Debug] Sayfadaki tüm HTML içinde 'prbx' kelimesi geçiyor mu: ${htmlText.includes('prbx')}`);
+
     const config = PARSERS[siteKey];
     const rows = doc.querySelectorAll(config.rowSelector);
 
@@ -1392,21 +1440,56 @@ export function renderResults() {
       </td>
       <td>
         <div class="qty-action-wrapper">
-          <input type="number" class="qty-input-table" id="qty-${product.key}" value="1" min="1">
-          <button class="add-cart-btn-table primary-btn" data-key="${product.key}">Ekle</button>
+          <div class="stepper-container">
+            <button class="stepper-btn dec-btn" data-key="${product.key}">−</button>
+            <input type="number" class="qty-input-table" id="qty-${product.key}" value="1" min="1">
+            <button class="stepper-btn inc-btn" data-key="${product.key}">+</button>
+          </div>
+          <button class="add-cart-btn-table primary-btn" data-key="${product.key}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px; display: inline-block; vertical-align: middle;"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+            Ekle
+          </button>
         </div>
       </td>
     `;
 
     tr.querySelector('.select-product-check').addEventListener('change', updateBulkDiscountBarVisibility);
 
+    // Artırma Butonu Olayı
+    tr.querySelector('.inc-btn').addEventListener('click', (e) => {
+      const btn = e.target.closest('.stepper-btn');
+      const key = btn.getAttribute('data-key');
+      const qtyInput = document.getElementById(`qty-${key}`);
+      let val = parseInt(qtyInput.value, 10);
+      if (isNaN(val)) val = 1;
+      qtyInput.value = val + 1;
+    });
+
+    // Azaltma Butonu Olayı
+    tr.querySelector('.dec-btn').addEventListener('click', (e) => {
+      const btn = e.target.closest('.stepper-btn');
+      const key = btn.getAttribute('data-key');
+      const qtyInput = document.getElementById(`qty-${key}`);
+      let val = parseInt(qtyInput.value, 10);
+      if (isNaN(val)) val = 1;
+      if (val > 1) {
+        qtyInput.value = val - 1;
+      }
+    });
+
+    // Tıklanınca Tümünü Seç Olayı
+    tr.querySelector('.qty-input-table').addEventListener('focus', (e) => {
+      e.target.select();
+    });
+
     tr.querySelector('.add-cart-btn-table').addEventListener('click', (e) => {
-      const key = e.target.getAttribute('data-key');
+      const btn = e.target.closest('.add-cart-btn-table');
+      const key = btn.getAttribute('data-key');
       const qtyInput = document.getElementById(`qty-${key}`);
       const qty = parseInt(qtyInput.value, 10);
       if (isNaN(qty) || qty <= 0) return;
 
-      addToSharedCart(product, qty, e.target);
+      addToSharedCart(product, qty, btn);
     });
 
     container.appendChild(tr);

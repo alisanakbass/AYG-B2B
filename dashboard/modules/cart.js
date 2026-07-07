@@ -2,6 +2,17 @@ import { state } from './state.js';
 import { getSourceKeyFromDomain, calculateSellingPrice, formatPrice, escapeHtml } from './utils.js';
 import { calculateTotalDiscountForProduct } from './discounts.js';
 
+export let salesHistoryPageIndex = 0;
+export const salesFilters = {
+  search: '',
+  startDate: '',
+  endDate: ''
+};
+
+export function setSalesHistoryPageIndex(index) {
+  salesHistoryPageIndex = index;
+}
+
 // Ortak Sepete Ürün Ekleme
 export function addToSharedCart(product, addedQty, buttonEl) {
   chrome.storage.local.get({ cart: {} }, (result) => {
@@ -374,13 +385,24 @@ export function submitCart(onSuccess) {
     totalSalesWithVat: grandTotalWithVat,
     totalProfitNoVat: totalProfitNoVat,
     totalProfitWithVat: totalProfitWithVat,
-    items: items.map(i => ({ name: i.name, qty: i.qty, basePrice: i.basePrice, domain: i.domain }))
+    items: items.map(i => ({
+      name: i.name,
+      qty: i.qty,
+      basePrice: i.basePrice,
+      domain: i.domain,
+      key: i.key || "",
+      sourceKey: i.sourceKey || getSourceKeyFromDomain(i.domain),
+      unit: i.unit || "ADET",
+      packQuantity: i.packQuantity || 1,
+      imgUrl: i.imgUrl || ""
+    }))
   };
 
   state.salesHistory.unshift(newSale);
 
   chrome.storage.local.set({ salesHistory: state.salesHistory, cart: {} }, () => {
     state.currentCart = {};
+    salesHistoryPageIndex = 0; // Reset page to newest on new sale
     renderCart();
     renderReports();
     if (onSuccess) onSuccess();
@@ -395,6 +417,8 @@ export function renderReports() {
   const statsTotalSalesWithVatEl = document.getElementById('stats-total-sales-with-vat');
   const statsTotalSalesNoVatEl = document.getElementById('stats-total-sales-no-vat');
   const salesHistoryRows = document.getElementById('sales-history-rows');
+  const paginationEl = document.getElementById('sales-history-pagination');
+  const currentDayLabelEl = document.getElementById('sales-history-current-day-label');
 
   if (!salesHistoryRows) return;
 
@@ -407,6 +431,7 @@ export function renderReports() {
   let totalSalesNoVat = 0;
   let totalSalesWithVat = 0;
 
+  // 1. Genel İstatistikleri Hesapla (Filtrelerden bağımsız - tüm geçmiş)
   state.salesHistory.forEach(sale => {
     const saleSalesNoVat = sale.totalSalesNoVat !== undefined ? sale.totalSalesNoVat : sale.totalSales / 1.20;
     const saleSalesWithVat = sale.totalSalesWithVat !== undefined ? sale.totalSalesWithVat : sale.totalSales;
@@ -428,17 +453,70 @@ export function renderReports() {
   if (statsTotalSalesWithVatEl) statsTotalSalesWithVatEl.textContent = "KDV'li: " + formatPrice(totalSalesWithVat);
   if (statsTotalSalesNoVatEl) statsTotalSalesNoVatEl.textContent = "KDV'siz: " + formatPrice(totalSalesNoVat);
 
-  if (state.salesHistory.length === 0) {
+  // 2. Filtreleri Uygula
+  let filteredSales = state.salesHistory;
+
+  // Arama filtresi (Ürün adı ile)
+  if (salesFilters.search.trim()) {
+    const q = salesFilters.search.toLowerCase().trim();
+    filteredSales = filteredSales.filter(sale => 
+      sale.items.some(item => item.name.toLowerCase().includes(q))
+    );
+  }
+
+  // Başlangıç tarihi filtresi
+  if (salesFilters.startDate) {
+    const startMs = new Date(salesFilters.startDate + "T00:00:00").getTime();
+    filteredSales = filteredSales.filter(sale => sale.timestamp >= startMs);
+  }
+
+  // Bitiş tarihi filtresi
+  if (salesFilters.endDate) {
+    const endMs = new Date(salesFilters.endDate + "T23:59:59").getTime();
+    filteredSales = filteredSales.filter(sale => sale.timestamp <= endMs);
+  }
+
+  if (filteredSales.length === 0) {
     salesHistoryRows.innerHTML = `
       <tr>
-        <td colspan="4" class="empty-history" style="text-align: center; color: var(--text-muted); padding: 15px; font-size: 13px;">Onaylanmış satış bulunmamaktadır.</td>
+        <td colspan="4" class="empty-history" style="text-align: center; color: var(--text-muted); padding: 15px; font-size: 13px;">Filtrelere uygun onaylanmış satış bulunmamaktadır.</td>
       </tr>
     `;
+    if (paginationEl) paginationEl.style.display = 'none';
     return;
   }
 
+  // 3. Gün Bazında Grupla
+  const groups = {};
+  filteredSales.forEach(sale => {
+    const dateObj = new Date(sale.timestamp);
+    const yyyy = dateObj.getFullYear();
+    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const dd = String(dateObj.getDate()).padStart(2, '0');
+    const dayKey = `${yyyy}-${mm}-${dd}`;
+    if (!groups[dayKey]) {
+      groups[dayKey] = [];
+    }
+    groups[dayKey].push(sale);
+  });
+
+  const uniqueDays = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+  const totalPages = uniqueDays.length;
+
+  // Sayfa sınırlarını kontrol et
+  if (salesHistoryPageIndex >= totalPages) {
+    salesHistoryPageIndex = totalPages - 1;
+  }
+  if (salesHistoryPageIndex < 0) {
+    salesHistoryPageIndex = 0;
+  }
+
+  const activeDay = uniqueDays[salesHistoryPageIndex];
+  const activeSales = groups[activeDay] || [];
+
+  // 4. Tabloyu Doldur (Seçilen Günün Satışları)
   salesHistoryRows.innerHTML = '';
-  state.salesHistory.forEach(sale => {
+  activeSales.forEach(sale => {
     const tr = document.createElement('tr');
     const dateStr = new Date(sale.timestamp).toLocaleString('tr-TR', {
       day: '2-digit',
@@ -462,7 +540,10 @@ export function renderReports() {
         <div>${formatPrice(saleProfitWithVat)}</div>
       </td>
       <td>
-        <button class="delete-sale-btn" data-id="${sale.id}">Sil</button>
+        <div style="display: flex; gap: 6px;">
+          <button class="secondary-btn view-sale-btn" data-id="${sale.id}" style="padding: 4px 8px; font-size: 11px; height: auto; min-height: 0; line-height: 1.2;">Detay</button>
+          <button class="danger-btn delete-sale-btn" data-id="${sale.id}" style="padding: 4px 8px; font-size: 11px; height: auto; min-height: 0; line-height: 1.2;">Sil</button>
+        </div>
       </td>
     `;
 
@@ -473,6 +554,28 @@ export function renderReports() {
 
     salesHistoryRows.appendChild(tr);
   });
+
+  // 5. Sayfalama Kontrollerini Güncelle
+  if (paginationEl) {
+    paginationEl.style.display = 'flex';
+    
+    const [y, m, d] = activeDay.split('-');
+    const formattedDay = `${d}.${m}.${y}`;
+    
+    if (currentDayLabelEl) {
+      currentDayLabelEl.textContent = `${formattedDay} (Sayfa ${salesHistoryPageIndex + 1} / ${totalPages})`;
+    }
+
+    const prevBtn = document.getElementById('sales-history-prev-day-btn');
+    const nextBtn = document.getElementById('sales-history-next-day-btn');
+
+    if (prevBtn) {
+      prevBtn.disabled = (salesHistoryPageIndex === 0);
+    }
+    if (nextBtn) {
+      nextBtn.disabled = (salesHistoryPageIndex === totalPages - 1);
+    }
+  }
 }
 
 // Tekil Satış Kaydını Sil
@@ -481,17 +584,6 @@ export function deleteSaleRecord(saleId) {
     state.salesHistory = state.salesHistory.filter(sale => sale.id !== saleId);
     chrome.storage.local.set({ salesHistory: state.salesHistory }, () => {
       renderReports();
-    });
-  }
-}
-
-// Tüm Satış Geçmişini Temizle
-export function clearSalesHistory() {
-  if (confirm("Tüm satış geçmişini tamamen temizlemek istediğinize emin misiniz? Bu işlem geri alınamaz!")) {
-    state.salesHistory = [];
-    chrome.storage.local.set({ salesHistory: [] }, () => {
-      renderReports();
-      alert("Tüm satış geçmişi başarıyla temizlendi.");
     });
   }
 }

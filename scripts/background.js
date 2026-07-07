@@ -6,7 +6,8 @@ const DEFAULT_URLS = {
   SITE_C: "https://bayi.yasarteknik.com.tr/YeniSiparisGir.asp?F=Ara&FAdi={query}",
   SITE_D: "https://yenibayi.polisankansai.com/order/makeordernew?search={query}",
   SITE_E: "https://bayi.akyuztools.com/Search/SearchProduct",
-  SITE_G: "https://www.nalburdayim.com/search/?q={query}"
+  SITE_G: "https://www.nalburdayim.com/search/?q={query}",
+  SITE_H: "https://b2b.kamilturk.com/Arama/_Prbx?q={query}"
 };
 
 // Eklenti yüklendiğinde veya güncellendiğinde alarmı kur ve kuralları ayarla
@@ -37,13 +38,28 @@ async function setupDeclarativeRules() {
         urlFilter: "||bayi.akyuztools.com/*",
         resourceTypes: ["xmlhttprequest"]
       }
+    },
+    {
+      id: 2,
+      priority: 1,
+      action: {
+        type: "modifyHeaders",
+        requestHeaders: [
+          { header: "origin", operation: "set", value: "https://b2b.kamilturk.com" },
+          { header: "referer", operation: "set", value: "https://b2b.kamilturk.com/" }
+        ]
+      },
+      condition: {
+        urlFilter: "||b2b.kamilturk.com/*",
+        resourceTypes: ["xmlhttprequest"]
+      }
     }
   ];
 
   try {
     // Eski kuralları temizle ve yenilerini ekle
     await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [1],
+      removeRuleIds: [1, 2],
       addRules: rules
     });
     console.log("[B2B Background] Declarative Net Request kuralları başarıyla tanımlandı.");
@@ -121,7 +137,8 @@ async function performBackgroundLoginForAll() {
     'site-c-check': true,
     'site-d-check': true,
     'site-e-check': true,
-    'site-g-check': false
+    'site-g-check': false,
+    'site-h-check': true
   }, r));
 
   const results = {};
@@ -142,6 +159,9 @@ async function performBackgroundLoginForAll() {
   }
   if (storage['site-g-check']) {
     results.SITE_G = await performLoginForSite('SITE_G');
+  }
+  if (storage['site-h-check']) {
+    results.SITE_H = await performLoginForSite('SITE_H');
   }
   return results;
 }
@@ -220,16 +240,24 @@ async function performLoginForSite(siteKey, isManual = false) {
   }
 
   let loginUrl = "";
-  try {
-    // Özelleştirilmiş URL şablonunu al
-    const syncKey = `url_${siteKey.toLowerCase()}`;
-    const syncData = await new Promise(r => chrome.storage.sync.get(syncKey, r));
-    const urlTemplate = syncData[syncKey] || DEFAULT_URLS[siteKey];
-    loginUrl = new URL(urlTemplate).origin;
-  } catch (e) {
-    // Hata durumunda varsayılan domain köküne yönel
-    const def = DEFAULT_URLS[siteKey];
-    loginUrl = def.split('/search')[0].split('/tr/')[0].split('/YeniSiparis')[0];
+  if (siteKey === 'SITE_H') {
+    loginUrl = "https://b2b.kamilturk.com/Login/Login";
+  } else {
+    try {
+      // Özelleştirilmiş URL şablonunu al
+      const syncKey = `url_${siteKey.toLowerCase()}`;
+      const syncData = await new Promise(r => chrome.storage.sync.get(syncKey, r));
+      const urlTemplate = syncData[syncKey] || DEFAULT_URLS[siteKey];
+      loginUrl = new URL(urlTemplate).origin;
+    } catch (e) {
+      // Hata durumunda varsayılan domain köküne yönel
+      const def = DEFAULT_URLS[siteKey];
+      if (def) {
+        loginUrl = def.split('/search')[0].split('/tr/')[0].split('/YeniSiparis')[0].split('/Arama')[0];
+      } else {
+        loginUrl = "https://b2b.kamilturk.com";
+      }
+    }
   }
 
   // Giriş bilgilerini sync storage'dan oku
@@ -242,7 +270,9 @@ async function performLoginForSite(siteKey, isManual = false) {
     cred_user_site_c: "1",
     cred_pass_site_c: "AYGUNLER",
     cred_user_site_d: "17183",
-    cred_pass_site_d: "27f4e5d"
+    cred_pass_site_d: "27f4e5d",
+    cred_user_site_h: "1340631",
+    cred_pass_site_h: "662732"
   }, r));
 
   // Eğer sync storage'da boş string olarak kayıtlıysa varsayılan değerleri atayalım
@@ -255,6 +285,8 @@ async function performLoginForSite(siteKey, isManual = false) {
   if (!creds.cred_pass_site_c) creds.cred_pass_site_c = "AYGUNLER";
   if (!creds.cred_user_site_d) creds.cred_user_site_d = "17183";
   if (!creds.cred_pass_site_d) creds.cred_pass_site_d = "27f4e5d";
+  if (!creds.cred_user_site_h) creds.cred_user_site_h = "1340631";
+  if (!creds.cred_pass_site_h) creds.cred_pass_site_h = "662732";
 
   let tab = null;
   try {
@@ -276,30 +308,37 @@ async function performLoginForSite(siteKey, isManual = false) {
     if (res.success) {
       if (res.alreadyLoggedIn) {
         await updateStorageSession(siteKey, true);
-        chrome.tabs.remove(tab.id);
+        try { chrome.tabs.remove(tab.id); } catch (e) { }
         return { success: true, message: "Zaten Giriş Yapılmış" };
       } else {
         // Giriş butonuna tıklandıysa, yönlendirme ve giriş yapılması için 4 saniye bekle
         await new Promise(r => setTimeout(r, 4000));
 
-        // Girişin başarılı olup olmadığını doğrulamak için tekrar kontrol et
-        const verifyResult = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: () => {
-            const hasPassword = !!document.querySelector('input[type="password"]');
-            return { loggedIn: !hasPassword };
-          }
-        });
+        let loggedIn = false;
+        try {
+          // Girişin başarılı olup olmadığını doğrulamak için tekrar kontrol et
+          const verifyResult = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => {
+              const hasPassword = !!document.querySelector('input[type="password"]');
+              return { loggedIn: !hasPassword };
+            }
+          });
+          loggedIn = verifyResult[0]?.result?.loggedIn || false;
+        } catch (verifyErr) {
+          // Yönlendirme bittiyse ve sekme kapandıysa veya erişilemez olduysa, giriş başarılı varsayılabilir
+          console.warn(`[B2B Background] ${siteKey} doğrulama sekmesi okunamadı, başarılı varsayılıyor.`, verifyErr);
+          loggedIn = true;
+        }
 
-        const loggedIn = verifyResult[0]?.result?.loggedIn || false;
         await updateStorageSession(siteKey, loggedIn);
 
-        chrome.tabs.remove(tab.id);
+        try { chrome.tabs.remove(tab.id); } catch (e) { }
         return { success: loggedIn, message: loggedIn ? "Giriş Başarılı" : "Şifre/Giriş Hatası veya Doldurma Yapılamadı" };
       }
     } else {
       await updateStorageSession(siteKey, false);
-      chrome.tabs.remove(tab.id);
+      try { chrome.tabs.remove(tab.id); } catch (e) { }
       return { success: false, message: res.reason || "Giriş başarısız oldu." };
     }
   } catch (error) {
@@ -375,6 +414,9 @@ function autoLoginScriptInPage(siteKey, creds) {
       } else if (siteKey === 'SITE_D') {
         username = creds.cred_user_site_d;
         password = creds.cred_pass_site_d;
+      } else if (siteKey === 'SITE_H') {
+        username = creds.cred_user_site_h;
+        password = creds.cred_pass_site_h;
       }
 
       if (!password) {

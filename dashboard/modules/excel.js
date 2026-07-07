@@ -298,9 +298,9 @@ export function setupExcelListeners() {
   }
 }
 
-// Sepetteki ürünleri teklif şablonuna yazıp indiren fonksiyon
-export async function exportCartAsExcelOffer(presetTeklifNo, metadata) {
-  const items = Object.values(state.currentCart);
+// Sepetteki veya verilen ürünleri teklif şablonuna yazıp indiren fonksiyon
+export async function exportCartAsExcelOffer(presetTeklifNo, metadata, customItems) {
+  const items = customItems || Object.values(state.currentCart);
   if (items.length === 0) {
     alert("Teklif oluşturabilmek için sepetinizde ürün bulunmalıdır.");
     return;

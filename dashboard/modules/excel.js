@@ -306,8 +306,8 @@ export async function exportCartAsExcelOffer(presetTeklifNo, metadata) {
     return;
   }
   
-  if (items.length > 22) {
-    alert("Teklif şablonu en fazla 22 ürün desteklemektedir. Lütfen sepetinizdeki ürün sayısını 22 veya daha az yapın.");
+  if (items.length > 100) {
+    alert("Teklif şablonu en fazla 100 ürün desteklemektedir. Lütfen sepetinizdeki ürün sayısını 100 veya daha az yapın.");
     return;
   }
 
@@ -489,7 +489,7 @@ export async function exportCartAsExcelOffer(presetTeklifNo, metadata) {
   }
 
   // Boş kalan teklif satırlarını temizle (varsa eski verilerden kurtulmak için)
-  for (let i = items.length; i < 22; i++) {
+  for (let i = items.length; i < 100; i++) {
     const r = startRow + i;
     setCell(r, 'D', "", 's');
     setCell(r, 'I', "", 's');

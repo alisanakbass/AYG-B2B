@@ -346,8 +346,8 @@ function setupUIEventListeners() {
           return;
         }
         
-        if (items.length > 22) {
-          alert("Teklif şablonu en fazla 22 ürün desteklemektedir. Lütfen sepetinizdeki ürün sayısını 22 veya daha az yapın.");
+        if (items.length > 100) {
+          alert("Teklif şablonu en fazla 100 ürün desteklemektedir. Lütfen sepetinizdeki ürün sayısını 100 veya daha az yapın.");
           return;
         }
 
@@ -380,7 +380,7 @@ function setupUIEventListeners() {
         const startRow = 18;
 
         // Sepetteki ürünleri ekle
-        for (let i = 0; i < 22; i++) {
+        for (let i = 0; i < 100; i++) {
           const item = items[i];
           
           if (item) {

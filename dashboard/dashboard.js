@@ -378,9 +378,10 @@ function setupUIEventListeners() {
         
         let grandTotalNoVat = 0;
         const startRow = 18;
+        const totalRowsToRender = Math.max(22, items.length);
 
         // Sepetteki ürünleri ekle
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < totalRowsToRender; i++) {
           const item = items[i];
           
           if (item) {

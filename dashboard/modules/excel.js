@@ -366,7 +366,7 @@ export async function exportCartAsExcelOffer(presetTeklifNo, metadata) {
   }
 
   // Hücre değerlerini ve formüllerini stili bozmadan XML düzeyinde güncellemek için yardımcı fonksiyon
-  function setCell(r, c, val, type, formula) {
+  function setCell(r, c, val, type, formula, styleId) {
     const addr = `${c}${r}`;
     
     // Satırı bul veya oluştur
@@ -401,6 +401,9 @@ export async function exportCartAsExcelOffer(presetTeklifNo, metadata) {
     if (!cellNode) {
       cellNode = xmlDoc.createElementNS(ns, "c");
       cellNode.setAttribute("r", addr);
+      if (styleId) {
+        cellNode.setAttribute("s", String(styleId));
+      }
       
       // Hücreyi sütun sırasına göre doğru konuma yerleştir
       const newColNum = colToNumber(c);
@@ -417,6 +420,10 @@ export async function exportCartAsExcelOffer(presetTeklifNo, metadata) {
       }
       if (!inserted) {
         rowNode.appendChild(cellNode);
+      }
+    } else {
+      if (styleId) {
+        cellNode.setAttribute("s", String(styleId));
       }
     }
 
@@ -460,6 +467,83 @@ export async function exportCartAsExcelOffer(presetTeklifNo, metadata) {
   // Ürünlerin doldurulacağı başlangıç satırı (Excel'de 18. satır)
   const startRow = 18;
 
+  // Eğer ürün sayısı 22'den fazlaysa alt satırları (KDV, İmza vb.) XML düzeyinde kaydır
+  if (items.length > 22) {
+    const diff = items.length - 22;
+    
+    // Yardımcı hücre kaydırma fonksiyonu
+    function shiftCellAddr(addr, rowDiff) {
+      const match = addr.match(/^([A-Z]+)([0-9]+)$/);
+      if (!match) return addr;
+      const col = match[1];
+      const row = parseInt(match[2], 10);
+      return `${col}${row + rowDiff}`;
+    }
+
+    // 1. Satırları kaydır (40. satırdan büyük veya eşit olanları)
+    const rows = Array.from(xmlDoc.getElementsByTagNameNS(ns, "row"));
+    rows.sort((a, b) => parseInt(b.getAttribute("r"), 10) - parseInt(a.getAttribute("r"), 10));
+
+    rows.forEach(rowNode => {
+      const r = parseInt(rowNode.getAttribute("r"), 10);
+      if (r >= 40) {
+        const newR = r + diff;
+        rowNode.setAttribute("r", String(newR));
+        
+        // Bu satırın altındaki c elementlerini de güncelle
+        const cells = Array.from(rowNode.getElementsByTagNameNS(ns, "c"));
+        cells.forEach(cellNode => {
+          const addr = cellNode.getAttribute("r");
+          cellNode.setAttribute("r", shiftCellAddr(addr, diff));
+        });
+      }
+    });
+
+    // 2. mergeCells düğümündeki birleştirilmiş hücreleri kaydır ve yeni ürün satırları için çoğalt
+    const mergeCellsEl = xmlDoc.getElementsByTagNameNS(ns, "mergeCells")[0];
+    if (mergeCellsEl) {
+      const mergeCellsList = Array.from(mergeCellsEl.getElementsByTagNameNS(ns, "mergeCell"));
+      
+      mergeCellsList.forEach(mc => {
+        const ref = mc.getAttribute("ref");
+        const parts = ref.split(":");
+        if (parts.length === 2) {
+          const startMatch = parts[0].match(/^([A-Z]+)([0-9]+)$/);
+          const endMatch = parts[1].match(/^([A-Z]+)([0-9]+)$/);
+          
+          if (startMatch && endMatch) {
+            const startCol = startMatch[1];
+            const startRowVal = parseInt(startMatch[2], 10);
+            const endCol = endMatch[1];
+            const endRowVal = parseInt(endMatch[2], 10);
+            
+            if (startRowVal >= 40) {
+              mc.setAttribute("ref", `${startCol}${startRowVal + diff}:${endCol}${endRowVal + diff}`);
+            }
+          }
+        }
+      });
+
+      // Yeni eklenen satırlar için (40'tan başlayıp startRow + items.length - 1'e kadar) mergeCell oluştur
+      for (let r = 40; r < startRow + items.length; r++) {
+        const newRanges = [
+          `B${r}:C${r}`,
+          `D${r}:H${r}`,
+          `J${r}:K${r}`
+        ];
+        newRanges.forEach(ref => {
+          const newMc = xmlDoc.createElementNS(ns, "mergeCell");
+          newMc.setAttribute("ref", ref);
+          mergeCellsEl.appendChild(newMc);
+        });
+      }
+      
+      const finalCells = mergeCellsEl.getElementsByTagNameNS(ns, "mergeCell");
+      mergeCellsEl.setAttribute("count", String(finalCells.length));
+    }
+  }
+
+  // Ürünleri tek tek yerleştir
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     const r = startRow + i;
@@ -481,22 +565,38 @@ export async function exportCartAsExcelOffer(presetTeklifNo, metadata) {
     const finalUnitPrice = unitPriceNoVat * multiplier;
 
     // Hücreleri XML düzeyinde güncelle (stilleri bozmadan)
-    setCell(r, 'D', item.name, 's');
-    setCell(r, 'I', itemUnit, 's');
-    setCell(r, 'J', item.qty, 'n');
-    setCell(r, 'L', Number(finalUnitPrice.toFixed(2)), 'n');
-    setCell(r, 'M', undefined, 'n', `J${r}*L${r}`);
+    // Yeni eklenen satırların kenarlıkları düzgün görünsün diye stilleri (styleId) atıyoruz
+    setCell(r, 'D', item.name, 's', undefined, 59);
+    setCell(r, 'I', itemUnit, 's', undefined, 39);
+    setCell(r, 'J', item.qty, 'n', undefined, 51);
+    setCell(r, 'L', Number(finalUnitPrice.toFixed(2)), 'n', undefined, 37);
+    setCell(r, 'M', undefined, 'n', `J${r}*L${r}`, 38);
+    
+    // Çizgilerin kaybolmaması için boş hücrelere de stillerini verelim
+    setCell(r, 'B', "", 's', undefined, 57);
+    setCell(r, 'C', "", 's', undefined, 58);
+    setCell(r, 'E', "", 's', undefined, 60);
+    setCell(r, 'F', "", 's', undefined, 60);
+    setCell(r, 'G', "", 's', undefined, 60);
+    setCell(r, 'H', "", 's', undefined, 61);
+    setCell(r, 'K', "", 's', undefined, 52);
   }
 
-  // Boş kalan teklif satırlarını temizle (varsa eski verilerden kurtulmak için)
-  for (let i = items.length; i < 100; i++) {
-    const r = startRow + i;
-    setCell(r, 'D', "", 's');
-    setCell(r, 'I', "", 's');
-    setCell(r, 'J', null, 'n');
-    setCell(r, 'L', null, 'n');
-    setCell(r, 'M', null, 'n');
+  // Eğer sepetimizdeki ürün sayısı 22'den azsa, şablonun orijinal 22 satırlık tablosunu temizleyelim (alt kısım kaymadı)
+  if (items.length < 22) {
+    for (let i = items.length; i < 22; i++) {
+      const r = startRow + i;
+      setCell(r, 'D', "", 's');
+      setCell(r, 'I', "", 's');
+      setCell(r, 'J', null, 'n');
+      setCell(r, 'L', null, 'n');
+      setCell(r, 'M', null, 'n');
+    }
   }
+
+  // Toplam satırını bulalım (normalde 40. satırdı, kaydırıldıysa 40 + diff. satır)
+  const totalRow = 40 + (items.length > 22 ? (items.length - 22) : 0);
+  setCell(totalRow, 'M', undefined, 'n', `SUM(M18:M${18 + items.length - 1})`, 35);
 
   // Tarih ve Teklif No güncelle (K11 ve K12 orijinal etiketleri korunur, L11 ve L12 hücrelerine değerler yazılır)
   const bugun = new Date().toLocaleDateString('tr-TR');

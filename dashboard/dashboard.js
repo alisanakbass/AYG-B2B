@@ -102,10 +102,14 @@ async function loadSettings() {
       cred_user_site_h: "1340631",
       cred_pass_site_h: "662732"
     }, (items) => {
-      // Eğer kullanıcıda eski/yanlış arama şablonu kayıtlıysa otomatik olarak AJAX (API) adresi ile değiştirelim
+      // Eğer kullanıcıda eski/yanlış arama şablonu kayıtlıysa otomatik olarak yeni adresler ile değiştirelim
       if (items.url_site_h === "https://b2b.kamilturk.com/Arama/Arama?q={query}" || !items.url_site_h) {
         items.url_site_h = DEFAULT_URLS.url_site_h;
         chrome.storage.sync.set({ url_site_h: DEFAULT_URLS.url_site_h });
+      }
+      if (items.url_site_g === "https://www.nalburdayim.com/search/?q={query}" || !items.url_site_g) {
+        items.url_site_g = DEFAULT_URLS.url_site_g;
+        chrome.storage.sync.set({ url_site_g: DEFAULT_URLS.url_site_g });
       }
 
       state.currentMargin = items.margin;

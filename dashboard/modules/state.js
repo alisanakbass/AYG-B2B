@@ -25,7 +25,7 @@ export const DEFAULT_URLS = {
   url_site_c: "https://bayi.yasarteknik.com.tr/YeniSiparisGir.asp?F=Ara&FAdi={query}",
   url_site_d: "https://yenibayi.polisankansai.com/order/makeordernew?search={query}",
   url_site_e: "https://bayi.akyuztools.com/Search/SearchProduct",
-  url_site_g: "https://www.nalburdayim.com/search/?q={query}",
+  url_site_g: "https://www.nalburdayim.com/?search_provider=aisearch&query={query}&page=1",
   url_site_h: "https://b2b.kamilturk.com/Arama/_Prbx?q={query}"
 };
 

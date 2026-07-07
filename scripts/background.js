@@ -6,7 +6,7 @@ const DEFAULT_URLS = {
   SITE_C: "https://bayi.yasarteknik.com.tr/YeniSiparisGir.asp?F=Ara&FAdi={query}",
   SITE_D: "https://yenibayi.polisankansai.com/order/makeordernew?search={query}",
   SITE_E: "https://bayi.akyuztools.com/Search/SearchProduct",
-  SITE_G: "https://www.nalburdayim.com/search/?q={query}",
+  SITE_G: "https://www.nalburdayim.com/?search_provider=aisearch&query={query}&page=1",
   SITE_H: "https://b2b.kamilturk.com/Arama/_Prbx?q={query}"
 };
 

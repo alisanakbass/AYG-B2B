@@ -10,39 +10,8 @@ export const PARSERS = {
   SITE_G: {
     name: "Nalburdayım",
     badgeClass: "site_g",
-    rowSelector: '.art',
-    parseRow: (row, domain) => {
-      const nameEl = row.querySelector('.art-title a') || row.querySelector('.art-title') || row.querySelector('a:not(.art-picture)');
-      if (!nameEl) return null;
-      const name = nameEl.textContent.trim();
-
-      const priceEl = row.querySelector('.art-price-value') || row.querySelector('.pd-finalprice-amount') || row.querySelector('.price-amount') || row.querySelector('.price') || row.querySelector('.art-price');
-      if (!priceEl) return null;
-      const rawPrice = parsePrice(priceEl.textContent);
-      const basePrice = rawPrice / 1.20; // KDV dahil fiyattan KDV'yi düşüyoruz.
-
-      const codeId = row.getAttribute('data-id') || '';
-      const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
-      const key = `b2b_${domain.replace(/\./g, '_')}_${codeId || cleanName}`;
-
-      let imgUrl = '';
-      const imgEl = row.querySelector('.art-picture img') || row.querySelector('.gal-item-viewport') || row.querySelector('img') || row.querySelector('a[href*="/media/"]');
-      if (imgEl) {
-        if (imgEl.tagName.toLowerCase() === 'img') {
-          imgUrl = imgEl.getAttribute('data-src') || imgEl.getAttribute('data-original') || imgEl.getAttribute('src') || '';
-        } else if (imgEl.tagName.toLowerCase() === 'a') {
-          imgUrl = imgEl.getAttribute('data-medium-image') || imgEl.getAttribute('href') || imgEl.getAttribute('data-thumb-image') || '';
-        }
-      }
-
-      if (imgUrl.startsWith('//')) {
-        imgUrl = 'https:' + imgUrl;
-      } else if (imgUrl && !imgUrl.startsWith('http')) {
-        imgUrl = 'https://www.nalburdayim.com' + (imgUrl.startsWith('/') ? '' : '/') + imgUrl;
-      }
-
-      return { key, name, basePrice, domain, imgUrl, unit: 'ADET', packQuantity: 1 };
-    }
+    rowSelector: null,
+    parseRow: null
   },
   SITE_F: {
     name: "Fırat Boru",
@@ -490,7 +459,13 @@ export async function fetchFromB2B(siteKey, query) {
   const settings = await new Promise(r => chrome.storage.sync.get(storageKey, r));
   const urlTemplate = settings[storageKey] || DEFAULT_URLS[storageKey];
 
-  const searchUrl = urlTemplate.replace('{query}', encodeURIComponent(query));
+  let encodedQuery = encodeURIComponent(query);
+  if (siteKey === 'SITE_G') {
+    // Nalburdayım boşlukların '+' olarak kodlanmasını bekler
+    encodedQuery = encodedQuery.replace(/%20/g, '+');
+  }
+
+  const searchUrl = urlTemplate.replace('{query}', encodedQuery);
   const domain = new URL(searchUrl).hostname;
 
   // --- ÖZKARADENİZ İNŞAAT (SITE_A) API SORGU YÖNTEMİ ---
@@ -1160,6 +1135,71 @@ export async function fetchFromB2B(siteKey, query) {
       return;
     } catch (apiError) {
       console.error(`[B2B Portal] Akyüzler API entegrasyon hatası:`, apiError);
+      updateStatusIndicator(siteKey, 'error', 'Hata Oluştu');
+      return;
+    }
+  }
+
+  // --- NALBURDAYIM (SITE_G) API ENTEGRASYONU ---
+  if (siteKey === 'SITE_G') {
+    const config = PARSERS[siteKey];
+    let itemsFoundCount = 0;
+    try {
+      const apiUrl = `https://api.aisearch.app/sites/2816/v1/search/query?query=${encodeURIComponent(query)}&expand=product%2Cfilter%2CpopularCategories%2Crecommendation&limit=30&attributes=&sort=&user_id=Nph4shd9r1RiNdAg&page=1&client-token=J4vJKeKUKIaNeLskrrFXXwnvqwk74QEp&lang=tr&d=www.nalburdayim.com`;
+
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json, text/plain, */*'
+        }
+      });
+
+      if (!response.ok) throw new Error(`HTTP Hata: ${response.status}`);
+
+      const data = await response.json();
+      const products = data.products || [];
+
+      products.forEach(p => {
+        try {
+          const name = p.name || 'Bilinmeyen Ürün';
+          const rawPrice = parseFloat(p.price) || parseFloat(p.buying_price) || 0;
+          const basePrice = rawPrice / 1.20; // KDV hariç taban fiyatı hesaplayalım.
+
+          const codeId = p.id || p.sku || '';
+          const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
+          const key = `b2b_${domain.replace(/\./g, '_')}_${codeId || cleanName}`;
+
+          let imgUrl = '';
+          if (p.images && p.images.length > 0) {
+            imgUrl = p.images[0];
+          }
+
+          if (basePrice > 0) {
+            const parsedPackQty = parsePackQuantityFromName(name);
+            state.currentResults.push({
+              key,
+              name,
+              basePrice,
+              domain,
+              imgUrl,
+              sourceKey: siteKey,
+              sourceName: config.name,
+              badgeClass: config.badgeClass,
+              unit: parsedPackQty ? 'PAKET' : 'ADET',
+              packQuantity: parsedPackQty || 1
+            });
+            itemsFoundCount++;
+          }
+        } catch (err) {
+          console.error(`[B2B Nalburdayım] Satır işleme hatası:`, err);
+        }
+      });
+
+      updateStatusIndicator(siteKey, 'success', `${itemsFoundCount} Ürün`);
+      if (itemsFoundCount > 0) updateSessionActive(siteKey);
+      return;
+    } catch (apiError) {
+      console.error(`[B2B Portal] Nalburdayım API entegrasyon hatası:`, apiError);
       updateStatusIndicator(siteKey, 'error', 'Hata Oluştu');
       return;
     }

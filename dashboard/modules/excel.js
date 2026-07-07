@@ -553,8 +553,8 @@ export async function exportCartAsExcelOffer(presetTeklifNo, metadata, customIte
     const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
     const margin = state.siteMargins[sourceKey] !== undefined ? state.siteMargins[sourceKey] : state.currentMargin;
     
-    // KDV'siz birim satış fiyatı
-    const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false);
+    // KDV'li birim satış fiyatı
+    const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, true);
     const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
     
     // Paket/Adet çarpanı
@@ -596,6 +596,7 @@ export async function exportCartAsExcelOffer(presetTeklifNo, metadata, customIte
 
   // Toplam satırını bulalım (normalde 40. satırdı, kaydırıldıysa 40 + diff. satır)
   const totalRow = 40 + (items.length > 22 ? (items.length - 22) : 0);
+  setCell(totalRow, 'B', "KDV DAHİL", 's');
   setCell(totalRow, 'M', undefined, 'n', `SUM(M18:M${18 + items.length - 1})`, 35);
 
   // Tarih ve Teklif No güncelle (K11 ve K12 orijinal etiketleri korunur, L11 ve L12 hücrelerine değerler yazılır)

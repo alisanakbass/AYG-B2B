@@ -414,7 +414,7 @@ function setupUIEventListeners() {
           const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
           const margin = state.siteMargins[sourceKey] !== undefined ? state.siteMargins[sourceKey] : state.currentMargin;
           
-          const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false);
+          const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, true);
           const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
           
           const itemUnit = (item.unit || 'ADET').toUpperCase();

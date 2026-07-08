@@ -195,22 +195,27 @@ async function performLoginForSite(siteKey, isManual = false) {
     const password = creds.cred_pass_site_c || "AYGUNLER";
 
     try {
+      console.log(`[B2B Background] Yaşar Teknik sessiz giriş isteği yapılıyor... Firma Kodu: ${companyCode}, Kullanıcı Kodu: ${username}`);
       const loginRes = await fetch("https://bayi.yasarteknik.com.tr/ajax/Login.asp", {
         method: "POST",
         credentials: "include",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded"
         },
-        body: `KullaniciAdiForm=${encodeURIComponent(companyCode)}&KullaniciKodu=${encodeURIComponent(username)}&Sifre=${encodeURIComponent(password)}`
+        body: `KullaniciAdi=${encodeURIComponent(companyCode)}&KullaniciKodu=${encodeURIComponent(username)}&Sifre=${encodeURIComponent(password)}`
       });
 
       if (loginRes.ok) {
         const text = await loginRes.text();
-        if (text.trim() === "1" || text.trim() === "0") {
+        const trimmedText = text.trim();
+        console.log(`[B2B Background] Yaşar Teknik sessiz giriş yanıt aldı. HTTP: ${loginRes.status}, Yanıt Metni: "${trimmedText}"`);
+        if (trimmedText === "1" || trimmedText === "0") {
           console.log("[B2B Background] Yaşar Teknik sessiz giriş başarılı.");
           await updateStorageSession('SITE_C', true);
           return { success: true, message: "Oturum Sessizce Açıldı" };
         }
+      } else {
+        console.warn(`[B2B Background] Yaşar Teknik sessiz giriş HTTP hatası: ${loginRes.status} ${loginRes.statusText}`);
       }
     } catch (err) {
       console.error("[B2B Background] Yaşar Teknik sessiz giriş hatası:", err);

@@ -299,7 +299,7 @@ export function setupExcelListeners() {
 }
 
 // Sepetteki veya verilen ürünleri teklif şablonuna yazıp indiren fonksiyon
-export async function exportCartAsExcelOffer(presetTeklifNo, metadata, customItems) {
+export async function exportCartAsExcelOffer(presetTeklifNo, metadata, customItems, includeVat = true) {
   const items = customItems || Object.values(state.currentCart);
   if (items.length === 0) {
     alert("Teklif oluşturabilmek için sepetinizde ürün bulunmalıdır.");
@@ -553,8 +553,8 @@ export async function exportCartAsExcelOffer(presetTeklifNo, metadata, customIte
     const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
     const margin = state.siteMargins[sourceKey] !== undefined ? state.siteMargins[sourceKey] : state.currentMargin;
     
-    // KDV'li birim satış fiyatı
-    const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, true);
+    // KDV'li veya KDV'siz birim satış fiyatı
+    const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, includeVat);
     const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
     
     // Paket/Adet çarpanı
@@ -596,7 +596,7 @@ export async function exportCartAsExcelOffer(presetTeklifNo, metadata, customIte
 
   // Toplam satırını bulalım (normalde 40. satırdı, kaydırıldıysa 40 + diff. satır)
   const totalRow = 40 + (items.length > 22 ? (items.length - 22) : 0);
-  setCell(totalRow, 'B', "KDV DAHİL", 's');
+  setCell(totalRow, 'B', includeVat ? "KDV DAHİL" : "KDV HARİÇ", 's');
   setCell(totalRow, 'M', undefined, 'n', `SUM(M18:M${18 + items.length - 1})`, 35);
 
   // Tarih ve Teklif No güncelle (K11 ve K12 orijinal etiketleri korunur, L11 ve L12 hücrelerine değerler yazılır)
@@ -701,7 +701,8 @@ export async function exportCartAsExcelOffer(presetTeklifNo, metadata, customIte
   const url = URL.createObjectURL(zipContent);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `AYG_TEKLIF_${teklifNo}.xlsx`;
+  const vatSuffix = includeVat ? "KDV_DAHIL" : "KDV_HARIC";
+  a.download = `AYG_TEKLIF_${teklifNo}_${vatSuffix}.xlsx`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

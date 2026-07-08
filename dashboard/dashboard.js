@@ -362,7 +362,7 @@ function setupUIEventListeners() {
   });
 
   // Genel Teklif Ön İzleme Açma Fonksiyonu
-  function openOfferPreview(items) {
+  function openOfferPreview(items, keepTeklifNo = false) {
     try {
       console.log("[B2B Teklif] Teklif önizleme açılıyor. Öğe sayısı:", items.length);
       
@@ -378,8 +378,10 @@ function setupUIEventListeners() {
 
       // Tarih ve Teklif No üret
       const bugun = new Date().toLocaleDateString('tr-TR');
-      activeTeklifNo = "AYG-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "-" + Math.floor(1000 + Math.random() * 9000);
-      console.log("[B2B Teklif] Üretilen Teklif No:", activeTeklifNo, "Tarih:", bugun);
+      if (!keepTeklifNo || !activeTeklifNo) {
+        activeTeklifNo = "AYG-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "-" + Math.floor(1000 + Math.random() * 9000);
+      }
+      console.log("[B2B Teklif] Üretilen/Korunan Teklif No:", activeTeklifNo, "Tarih:", bugun);
       
       const previewNoEl = document.getElementById('preview-teklif-no');
       const previewTarihEl = document.getElementById('preview-tarih');
@@ -414,7 +416,10 @@ function setupUIEventListeners() {
           const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
           const margin = state.siteMargins[sourceKey] !== undefined ? state.siteMargins[sourceKey] : state.currentMargin;
           
-          const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, true);
+          const vatToggle = document.getElementById('offer-preview-vat-toggle');
+          const includeVat = vatToggle ? vatToggle.checked : true;
+          
+          const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, includeVat);
           const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
           
           const itemUnit = (item.unit || 'ADET').toUpperCase();
@@ -457,6 +462,14 @@ function setupUIEventListeners() {
       const totalValEl = document.getElementById('preview-offer-total-val');
       if (totalValEl) totalValEl.textContent = formatPrice(grandTotalNoVat);
 
+      // KDV etiketini güncelle
+      const vatLabelEl = document.getElementById('preview-offer-vat-label');
+      if (vatLabelEl) {
+        const vatToggle = document.getElementById('offer-preview-vat-toggle');
+        const includeVat = vatToggle ? vatToggle.checked : true;
+        vatLabelEl.textContent = includeVat ? "KDV DAHİL" : "KDV HARİÇ";
+      }
+
       // Aktif ihraç edilecek listeyi kaydet
       activeOfferItems = items;
 
@@ -481,6 +494,7 @@ function setupUIEventListeners() {
   // Modalı Kapatma Dinleyicileri
   const closeOfferModal = () => {
     if (offerPreviewModal) offerPreviewModal.classList.remove('open');
+    activeTeklifNo = "";
   };
 
   if (offerPreviewCloseBtn) offerPreviewCloseBtn.addEventListener('click', closeOfferModal);
@@ -488,6 +502,16 @@ function setupUIEventListeners() {
   if (offerPreviewModal) {
     offerPreviewModal.addEventListener('click', (e) => {
       if (e.target === offerPreviewModal) closeOfferModal();
+    });
+  }
+
+  // KDV Durumu Değiştiğinde Önizlemeyi Güncelle
+  const vatToggle = document.getElementById('offer-preview-vat-toggle');
+  if (vatToggle) {
+    vatToggle.addEventListener('change', () => {
+      if (activeOfferItems) {
+        openOfferPreview(activeOfferItems, true);
+      }
     });
   }
 
@@ -515,8 +539,11 @@ function setupUIEventListeners() {
           sayinSag: getVal('input-sayin-sag')
         };
 
+        const vatToggle = document.getElementById('offer-preview-vat-toggle');
+        const includeVat = vatToggle ? vatToggle.checked : true;
+
         const { exportCartAsExcelOffer } = await import('./modules/excel.js');
-        await exportCartAsExcelOffer(activeTeklifNo, metadata, activeOfferItems);
+        await exportCartAsExcelOffer(activeTeklifNo, metadata, activeOfferItems, includeVat);
 
         offerPreviewDownloadBtn.innerHTML = originalText;
         offerPreviewDownloadBtn.disabled = false;

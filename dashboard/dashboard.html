@@ -2902,7 +2902,7 @@
               </tbody>
               <tfoot>
                 <tr style="border-top: 1px solid #000;">
-                  <td colspan="4" style="border-right: 1px solid #000; padding: 8px; font-weight: bold; background: #fff;">KDV DAHİL</td>
+                  <td id="preview-offer-vat-label" colspan="4" style="border-right: 1px solid #000; padding: 8px; font-weight: bold; background: #fff;">KDV DAHİL</td>
                   <td style="border-right: 1px solid #000; padding: 8px; font-weight: bold; text-align: right; background: #f8fafc;">TOPLAM</td>
                   <td id="preview-offer-total-val" style="padding: 8px; font-weight: bold; text-align: right; background: #fff;">0,00 TL</td>
                 </tr>
@@ -2919,7 +2919,13 @@
           </div>
         </div>
         
-        <div class="modal-footer" style="padding: 15px 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px; background: #f8fafc;">
+        <div class="modal-footer" style="padding: 15px 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; align-items: center; gap: 10px; background: #f8fafc;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-right: auto; font-size: 13px; font-weight: 600; color: #334155;">
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;">
+              <input type="checkbox" id="offer-preview-vat-toggle" checked style="width: 16px; height: 16px; accent-color: #10b981; cursor: pointer;">
+              <span>Fiyatlara KDV (%20) Dahil Et</span>
+            </label>
+          </div>
           <button id="offer-preview-cancel-btn" style="padding: 8px 16px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; color: #475569; font-weight: 600; cursor: pointer; font-size: 13px;">Kapat</button>
           <button id="offer-preview-download-btn" style="padding: 8px 20px; border-radius: 6px; border: none; background: #10b981; color: white; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><polyline points="9 15 12 18 15 15"></polyline></svg>

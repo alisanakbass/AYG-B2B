@@ -419,7 +419,9 @@ function setupUIEventListeners() {
           const vatToggle = document.getElementById('offer-preview-vat-toggle');
           const includeVat = vatToggle ? vatToggle.checked : true;
           
-          const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, includeVat);
+          const rawUnitPriceNoVat = includeVat 
+            ? calculateSellingPrice(item.basePrice, margin, true) 
+            : calculateSellingPrice(item.basePrice, 0, false);
           const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
           
           const itemUnit = (item.unit || 'ADET').toUpperCase();

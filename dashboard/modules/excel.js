@@ -553,8 +553,10 @@ export async function exportCartAsExcelOffer(presetTeklifNo, metadata, customIte
     const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
     const margin = state.siteMargins[sourceKey] !== undefined ? state.siteMargins[sourceKey] : state.currentMargin;
     
-    // KDV'li veya KDV'siz birim satış fiyatı
-    const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, includeVat);
+    // KDV'li veya KDV'siz (karsız alış) birim satış fiyatı
+    const rawUnitPriceNoVat = includeVat 
+      ? calculateSellingPrice(item.basePrice, margin, true) 
+      : calculateSellingPrice(item.basePrice, 0, false);
     const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
     
     // Paket/Adet çarpanı

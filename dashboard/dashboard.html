@@ -112,21 +112,29 @@
             </svg>
             <span>Ayarlar</span>
           </button>
+          <a href="https://aygliste.netlify.app/" target="_blank" class="menu-btn blue-btn" style="text-decoration: none;">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="1" y="3" width="15" height="13"></rect>
+              <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+              <circle cx="5.5" cy="18.5" r="2.5"></circle>
+              <circle cx="18.5" cy="18.5" r="2.5"></circle>
+            </svg>
+            <span>AYG Lojistik</span>
+          </a>
         </nav>
 
         <section class="sidebar-section sidebar-section-sites">
           <h2>B2B Siteleri</h2>
-          <div
-            class="exchange-rates-panel"
-            id="exchange-rates-panel"
-            style="display: none"
-          >
-            <div class="rates-title">Güncel Döviz Kurları</div>
-            <div class="rates-body">
-              <span>USD: <b id="usd-rate-val">Yükleniyor...</b></span>
-              <span>EUR: <b id="eur-rate-val">Yükleniyor...</b></span>
-            </div>
-          </div>
+          <!-- Exchange rates moved to header -->
           <div class="sites-list">
             <div class="site-item" data-site="SITE_A">
               <label class="site-checkbox-label">
@@ -631,6 +639,18 @@
                   autocomplete="off"
                 />
                 <button id="search-btn" class="primary-btn">Sorgula</button>
+              </div>
+              <!-- Döviz Kurları Gösterge Paneli -->
+              <div
+                class="exchange-rates-panel"
+                id="exchange-rates-panel"
+                style="display: none"
+              >
+                <div class="rates-title">Kurlar</div>
+                <div class="rates-body">
+                  <span>USD: <b id="usd-rate-val">Yükleniyor...</b></span>
+                  <span>EUR: <b id="eur-rate-val">Yükleniyor...</b></span>
+                </div>
               </div>
               <button
                 id="header-cart-btn"

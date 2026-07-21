@@ -1125,33 +1125,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
-// Görsel yüklenemediğinde çalışan merkezi hata yakalayıcı (CSP Uyumlu)
+// Görsel yüklenemediğinde çalışan merkezi hata yakalayıcı (CSP Uyumlu & Optimize Edilmiş)
 document.addEventListener('error', (e) => {
-  if (e.target.tagName === 'IMG' && e.target.classList.contains('product-img')) {
+  if (e.target && e.target.tagName === 'IMG' && e.target.classList.contains('product-img')) {
     const img = e.target;
-    const src = img.src;
-    const code = img.getAttribute('data-code');
+    if (img.dataset.failed) return;
+    img.dataset.failed = 'true';
 
-    const filename = src.substring(src.lastIndexOf('/') + 1);
-    const isNameBased = /[a-zA-Z]/.test(filename);
-
-    if (isNameBased && src.includes('images/')) {
-      if (code) {
-        img.src = 'https://cdn.jsdelivr.net/gh/alisanakbass/AYG-B2B@main/images/' + code + '.png';
-      } else {
-        img.src = '../logo.png';
-      }
-    }
-    else if (src.includes('images/')) {
-      if (src.endsWith('.png')) {
-        img.src = src.replace('.png', '.jpeg');
-      } else if (src.endsWith('.jpeg')) {
-        img.src = src.replace('.jpeg', '.jpg');
-      } else {
-        img.src = '../logo.png';
-      }
+    img.style.display = 'none';
+    const placeholder = img.nextElementSibling;
+    if (placeholder && placeholder.classList.contains('product-img-placeholder')) {
+      placeholder.style.display = 'block';
     } else {
       img.src = '../logo.png';
+      img.style.display = 'block';
     }
   }
 }, true);

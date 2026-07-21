@@ -5,7 +5,21 @@ import { calculateTotalDiscountForProduct } from './discounts.js';
 
 // Fırat Boru istatistiklerini yükleyen fonksiyon
 export async function loadFiratStats() {
-  chrome.storage.local.get(['firatBoruList', 'firatLastUpdate'], (res) => {
+  const getFiratStorage = (cb) => {
+    try {
+      if (typeof chrome !== 'undefined' && chrome?.storage?.local) {
+        chrome.storage.local.get(['firatBoruList', 'firatLastUpdate'], cb);
+      } else {
+        const rawList = localStorage.getItem('firatBoruList');
+        const lastUpd = localStorage.getItem('firatLastUpdate');
+        cb({ firatBoruList: rawList ? JSON.parse(rawList) : [], firatLastUpdate: lastUpd || 'Veri Yok' });
+      }
+    } catch(e) {
+      cb({ firatBoruList: [], firatLastUpdate: 'Veri Yok' });
+    }
+  };
+
+  getFiratStorage((res) => {
     const list = res.firatBoruList || [];
     const lastUpdate = res.firatLastUpdate || 'Veri Yok';
 
@@ -31,7 +45,20 @@ export async function loadFiratStats() {
 // Yerel Fırat Boru verilerinde arama yapan fonksiyon
 export async function fetchFromLocalFirat(query) {
   return new Promise((resolve) => {
-    chrome.storage.local.get(['firatBoruList'], (res) => {
+    const getList = (cb) => {
+      try {
+        if (typeof chrome !== 'undefined' && chrome?.storage?.local) {
+          chrome.storage.local.get(['firatBoruList'], cb);
+        } else {
+          const raw = localStorage.getItem('firatBoruList');
+          cb({ firatBoruList: raw ? JSON.parse(raw) : [] });
+        }
+      } catch(e) {
+        cb({ firatBoruList: [] });
+      }
+    };
+
+    getList((res) => {
       const list = res.firatBoruList || [];
 
       if (list.length === 0) {

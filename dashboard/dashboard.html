@@ -10,6 +10,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="dashboard.css" />
+    <link rel="icon" href="../logo.png" type="image/png" />
     <script src="../xlsx.full.min.js"></script>
     <script src="../jszip.min.js"></script>
   </head>
@@ -607,6 +608,18 @@
       </aside>
 
       <main class="main-content">
+        <!-- AYG Sipariş Seçim Modu Bilgi Çubuğu -->
+        <div id="ayg-order-mode-banner" style="display: none; background: linear-gradient(90deg, #059669 0%, #10b981 100%); color: white; padding: 12px 20px; font-size: 14px; font-weight: 600; align-items: center; justify-content: space-between; box-shadow: 0 4px 12px rgba(16,185,129,0.2); margin: 15px 20px 0 20px; border-radius: 12px; z-index: 100;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 20px;">📦</span>
+            <span><strong>AYG Sipariş Modu Aktif:</strong> Seçtiğiniz ürünler canlı olarak AYG Sipariş Oluştur formuna aktarılır.</span>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button id="btn-transfer-cart-to-ayg" onclick="if(window.transferCartToAygOrder) window.transferCartToAygOrder()" style="background: rgba(255,255,255,0.25); color: white; border: 1px solid rgba(255,255,255,0.4); padding: 6px 14px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: all 0.2s;">
+              🛒 Sepettekileri Siparişe Aktar
+            </button>
+          </div>
+        </div>
         <div id="page-search" class="dashboard-page active">
           <header class="main-header">
             <div

@@ -13,10 +13,108 @@ export function setSalesHistoryPageIndex(index) {
   salesHistoryPageIndex = index;
 }
 
+// AYG Sipariş Portalı Canlı Aktarım Lojiği
+export function sendProductToAygOrder(product, qty = 1) {
+  const item = {
+    name: product.name,
+    unit: (product.unit || 'ADET').toLowerCase(),
+    qty: qty || product.qty || 1
+  };
+
+  // 1. BroadcastChannel
+  try {
+    const bc = new BroadcastChannel('ayg_b2b_cart');
+    bc.postMessage({ type: 'ADD_ORDER_ITEM', item: item });
+  } catch (e) {}
+
+  // 2. window.opener postMessage
+  try {
+    if (window.opener) {
+      window.opener.postMessage({ type: 'ADD_ORDER_ITEM', item: item }, '*');
+    }
+  } catch (e) {}
+
+  // 3. localStorage yedek
+  try {
+    const existing = JSON.parse(localStorage.getItem('ayg_pending_order_items') || '[]');
+    existing.push(item);
+    localStorage.setItem('ayg_pending_order_items', JSON.stringify(existing));
+  } catch (e) {}
+}
+
+export function transferCartToAygOrder() {
+  const items = Object.values(state.currentCart || {}).map(item => ({
+    name: item.name,
+    unit: (item.unit || 'ADET').toLowerCase(),
+    qty: item.qty || 1
+  }));
+
+  if (items.length === 0) {
+    alert("Sepetinizde ürün bulunmuyor.");
+    return;
+  }
+
+  // 1. BroadcastChannel
+  try {
+    const bc = new BroadcastChannel('ayg_b2b_cart');
+    bc.postMessage({ type: 'IMPORT_B2B_CART', items: items });
+  } catch (e) {}
+
+  // 2. window.opener
+  try {
+    if (window.opener) {
+      window.opener.postMessage({ type: 'IMPORT_B2B_CART', items: items }, '*');
+    }
+  } catch (e) {}
+
+  // 3. localStorage
+  try {
+    const existing = JSON.parse(localStorage.getItem('ayg_pending_order_items') || '[]');
+    const combined = existing.concat(items);
+    localStorage.setItem('ayg_pending_order_items', JSON.stringify(combined));
+  } catch (e) {}
+
+  alert(`Sepetteki ${items.length} ürün AYG Sipariş formuna aktarıldı!`);
+}
+
+if (typeof window !== 'undefined') {
+  window.sendProductToAygOrder = sendProductToAygOrder;
+  window.transferCartToAygOrder = transferCartToAygOrder;
+}
+
 // Ortak Sepete Ürün Ekleme
 export function addToSharedCart(product, addedQty, buttonEl) {
-  chrome.storage.local.get({ cart: {} }, (result) => {
-    const cart = result.cart;
+  // AYG Sipariş modundaysak SADECE AYG Sipariş Formuna aktar (Eklenti sepetine ekleme yapma!)
+  if (window.isAygOrderMode) {
+    sendProductToAygOrder(product, addedQty);
+
+    // Görsel Başarı Bildirimi
+    if (buttonEl) {
+      buttonEl.textContent = "Siparişe Eklendi! ✓";
+      buttonEl.classList.add('success');
+      setTimeout(() => {
+        buttonEl.textContent = "Ekle";
+        buttonEl.classList.remove('success');
+      }, 1200);
+    }
+    return; // Eklenti sepetine ekleme, doğrudan çık
+  }
+
+  const getCartStorage = (cb) => {
+    try {
+      if (typeof chrome !== 'undefined' && chrome?.storage?.local) {
+        chrome.storage.local.get({ cart: {} }, cb);
+      } else {
+        const raw = localStorage.getItem('ayg_b2b_cart');
+        cb({ cart: raw ? JSON.parse(raw) : {} });
+      }
+    } catch(e) {
+      cb({ cart: {} });
+    }
+  };
+
+  getCartStorage((result) => {
+    const cart = result.cart || {};
     const newQty = (cart[product.key]?.qty || 0) + addedQty;
 
     cart[product.key] = {
@@ -31,7 +129,20 @@ export function addToSharedCart(product, addedQty, buttonEl) {
       imgUrl: product.imgUrl || '../logo.png'
     };
 
-    chrome.storage.local.set({ cart: cart }, () => {
+    const setCartStorage = (newCart, cb) => {
+      try {
+        if (typeof chrome !== 'undefined' && chrome?.storage?.local) {
+          chrome.storage.local.set({ cart: newCart }, cb);
+        } else {
+          localStorage.setItem('ayg_b2b_cart', JSON.stringify(newCart));
+          cb();
+        }
+      } catch(e) {
+        cb();
+      }
+    };
+
+    setCartStorage(cart, () => {
       state.currentCart = cart;
       renderCart();
 

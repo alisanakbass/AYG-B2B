@@ -285,9 +285,16 @@ export const PARSERS = {
 
 // --- SESSION CHECKERS (Oturum Durum Kontrolleri) ---
 export async function checkAllSessions() {
-  const storageData = await new Promise(r =>
-    chrome.storage.local.get(['enderyapi_token', 'akyuz_token', 'session_SITE_A', 'session_SITE_C', 'session_SITE_D', 'session_SITE_E', 'session_SITE_H'], r)
-  );
+  let storageData = {};
+  try {
+    if (typeof chrome !== 'undefined' && chrome?.storage?.local) {
+      storageData = await new Promise(r =>
+        chrome.storage.local.get(['enderyapi_token', 'akyuz_token', 'session_SITE_A', 'session_SITE_C', 'session_SITE_D', 'session_SITE_E', 'session_SITE_H'], r)
+      ) || {};
+    }
+  } catch (err) {
+    console.warn("[AYG B2B] chrome.storage erişilemedi, varsayılan kontrol uygulanıyor:", err);
+  }
 
   updateStatusIndicator('SITE_A',
     storageData.session_SITE_A ? 'success' : 'idle',

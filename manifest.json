@@ -50,5 +50,17 @@
       "run_at": "document_start",
       "all_frames": true
     }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "dashboard/dashboard.html",
+        "dashboard/dashboard.js",
+        "dashboard/dashboard.css",
+        "dashboard/modules/*",
+        "images/*"
+      ],
+      "matches": ["<all_urls>"]
+    }
   ]
 }

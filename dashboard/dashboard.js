@@ -1,9 +1,30 @@
 import { state, DEFAULT_URLS } from './modules/state.js';
 import { formatPrice, getSourceKeyFromDomain, calculateSellingPrice } from './modules/utils.js';
 import { initDiscounts, calculateTotalDiscountForProduct, renderKeywordDiscountRules, renderProductDiscountRules, reapplyAllDiscounts } from './modules/discounts.js';
-import { renderCart, renderReports, confirmCart, submitCart, salesHistoryPageIndex, setSalesHistoryPageIndex, salesFilters } from './modules/cart.js';
+import { renderCart, renderReports, confirmCart, submitCart, salesHistoryPageIndex, setSalesHistoryPageIndex, salesFilters, transferCartToAygOrder, sendProductToAygOrder } from './modules/cart.js';
 import { loadFiratStats, loadDefaultExcelIfEmpty, setupExcelListeners } from './modules/excel.js';
 import { checkUpdates, checkAllSessions, executeSearch, recalculateAllResults, applySorting, renderResults, updateBulkDiscountBarVisibility } from './modules/search.js';
+
+// AYG Sipariş Seçim Modu Algılama
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('mode') === 'ayg_order' || urlParams.get('source') === 'ayg') {
+  window.isAygOrderMode = true;
+}
+
+function checkAndShowAygBanner() {
+  if (window.isAygOrderMode) {
+    const banner = document.getElementById('ayg-order-mode-banner');
+    if (banner) {
+      banner.style.display = 'flex';
+    }
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', checkAndShowAygBanner);
+} else {
+  checkAndShowAygBanner();
+}
 
 // Döviz kurlarını güncelleyen fonksiyon
 async function fetchExchangeRates() {
@@ -61,7 +82,7 @@ function updateExchangeRatesUI() {
 // Ayarları Yükle
 async function loadSettings() {
   return new Promise((resolve) => {
-    chrome.storage.sync.get({
+    const defaultSettings = {
       margin: 40,
       margin_site_a: 40,
       margin_site_b: 40,
@@ -101,15 +122,15 @@ async function loadSettings() {
       cred_pass_site_g: "",
       cred_user_site_h: "1340631",
       cred_pass_site_h: "662732"
-    }, (items) => {
+    };
+
+    const processSettings = (items) => {
       // Eğer kullanıcıda eski/yanlış arama şablonu kayıtlıysa otomatik olarak yeni adresler ile değiştirelim
       if (items.url_site_h === "https://b2b.kamilturk.com/Arama/Arama?q={query}" || !items.url_site_h) {
         items.url_site_h = DEFAULT_URLS.url_site_h;
-        chrome.storage.sync.set({ url_site_h: DEFAULT_URLS.url_site_h });
       }
       if (items.url_site_g === "https://www.nalburdayim.com/search/?q={query}" || !items.url_site_g) {
         items.url_site_g = DEFAULT_URLS.url_site_g;
-        chrome.storage.sync.set({ url_site_g: DEFAULT_URLS.url_site_g });
       }
 
       state.currentMargin = items.margin;
@@ -195,7 +216,17 @@ async function loadSettings() {
       renderProductDiscountRules();
 
       resolve();
-    });
+    };
+
+    try {
+      if (typeof chrome !== 'undefined' && chrome?.storage?.sync) {
+        chrome.storage.sync.get(defaultSettings, processSettings);
+      } else {
+        processSettings(defaultSettings);
+      }
+    } catch (e) {
+      processSettings(defaultSettings);
+    }
   });
 }
 
@@ -1069,27 +1100,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Storage değişikliklerini izle
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'sync') {
-      const keys = Object.keys(changes);
-      const isPricingChange = keys.some(k => k.startsWith('margin_site_') || k.startsWith('discount_site_') || k === 'margin' || k === 'keywordDiscounts' || k === 'productDiscounts');
-      if (isPricingChange) {
-        loadSettings().then(() => {
-          recalculateAllResults();
+  if (typeof chrome !== 'undefined' && chrome?.storage?.onChanged) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'sync') {
+        const keys = Object.keys(changes);
+        const isPricingChange = keys.some(k => k.startsWith('margin_site_') || k.startsWith('discount_site_') || k === 'margin' || k === 'keywordDiscounts' || k === 'productDiscounts');
+        if (isPricingChange) {
+          loadSettings().then(() => {
+            recalculateAllResults();
+            renderCart();
+          });
+        }
+      }
+      if (area === 'local') {
+        if (changes.cart) {
+          state.currentCart = changes.cart.newValue || {};
           renderCart();
-        });
+        }
+        if (changes.enderyapi_token || changes.session_SITE_A || changes.session_SITE_C) {
+          checkAllSessions();
+        }
       }
-    }
-    if (area === 'local') {
-      if (changes.cart) {
-        state.currentCart = changes.cart.newValue || {};
-        renderCart();
-      }
-      if (changes.enderyapi_token || changes.session_SITE_A || changes.session_SITE_C) {
-        checkAllSessions();
-      }
-    }
-  });
+    });
+  }
 });
 
 // Görsel yüklenemediğinde çalışan merkezi hata yakalayıcı (CSP Uyumlu)

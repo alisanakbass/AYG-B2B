@@ -439,9 +439,11 @@ input:checked + .slider:before {
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
+  user-select: none;
 }
 
-.collapsible-header h2 {
+.collapsible-header h2,
+.collapsible-header h3 {
   margin-bottom: 0;
 }
 
@@ -456,14 +458,25 @@ input:checked + .slider:before {
 }
 
 .collapsible-content {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.3s ease-out;
+  max-height: 0 !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  padding-left: 16px;
+  padding-right: 16px;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  overflow: hidden !important;
+  transition: max-height 0.35s ease-out, opacity 0.25s ease-out, padding 0.35s ease-out, margin 0.35s ease-out !important;
 }
 
 .collapsible-content.open {
-  max-height: 400px;
-  margin-top: 14px;
+  max-height: 3000px !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  padding-top: 16px !important;
+  padding-bottom: 16px !important;
 }
 
 /* Cart Styles */

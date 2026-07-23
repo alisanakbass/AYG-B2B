@@ -10,6 +10,7 @@ export const state = {
   selectedFilterSite: 'ALL', // Aktif filtrelenen site key (örn: SITE_C veya ALL)
   currentProductDiscounts: {}, // Ürün bazlı özel kalıcı iskontolar {productKey: {name, discount, domain}}
   keywordDiscounts: [], // Kelime bazlı otomatik iskontolar [{id, keyword, discount}]
+  priceRangeDiscounts: [], // Fiyat aralığına göre iskontolar [{id, min, max, discount}]
   salesHistory: [], // Satış geçmişi
   exchangeRates: {
     USD: 33.00,

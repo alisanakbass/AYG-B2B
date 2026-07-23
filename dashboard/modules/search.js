@@ -1386,8 +1386,71 @@ export function renderResults() {
     return;
   }
 
+// Sonuçlar Tablosu Olay Görevlendirmesi (Event Delegation - Bellek ve Performans İyileştirmesi)
+let isResultsTableEventsBound = false;
+function setupResultsTableDelegation(container) {
+  if (isResultsTableEventsBound) return;
+  isResultsTableEventsBound = true;
+
+  container.addEventListener('change', (e) => {
+    if (e.target.classList.contains('select-product-check')) {
+      updateBulkDiscountBarVisibility();
+    }
+  });
+
+  container.addEventListener('focusin', (e) => {
+    if (e.target.classList.contains('qty-input-table')) {
+      e.target.select();
+    }
+  });
+
+  container.addEventListener('click', (e) => {
+    const incBtn = e.target.closest('.inc-btn');
+    if (incBtn) {
+      const key = incBtn.getAttribute('data-key');
+      const qtyInput = document.getElementById(`qty-${key}`);
+      if (qtyInput) {
+        let val = parseInt(qtyInput.value, 10);
+        if (isNaN(val)) val = 1;
+        qtyInput.value = val + 1;
+      }
+      return;
+    }
+
+    const decBtn = e.target.closest('.dec-btn');
+    if (decBtn) {
+      const key = decBtn.getAttribute('data-key');
+      const qtyInput = document.getElementById(`qty-${key}`);
+      if (qtyInput) {
+        let val = parseInt(qtyInput.value, 10);
+        if (isNaN(val)) val = 1;
+        if (val > 1) qtyInput.value = val - 1;
+      }
+      return;
+    }
+
+    const addCartBtn = e.target.closest('.add-cart-btn-table');
+    if (addCartBtn) {
+      const key = addCartBtn.getAttribute('data-key');
+      const product = state.currentResults.find(p => p.key === key);
+      if (product) {
+        const qtyInput = document.getElementById(`qty-${key}`);
+        const qty = qtyInput ? parseInt(qtyInput.value, 10) : 1;
+        if (!isNaN(qty) && qty > 0) {
+          addToSharedCart(product, qty, addCartBtn);
+        }
+      }
+      return;
+    }
+  });
+}
+
+  setupResultsTableDelegation(container);
+  container.innerHTML = '';
+  const fragment = document.createDocumentFragment();
+
   filtered.forEach((product) => {
-    const discInfo = calculateTotalDiscountForProduct(product.name, product.key, product.sourceKey);
+    const discInfo = calculateTotalDiscountForProduct(product.name, product.key, product.sourceKey, product.basePrice);
 
     const purchaseNoVat = product.basePrice;
     const purchaseWithVat = product.basePrice * 1.20;
@@ -1500,48 +1563,10 @@ export function renderResults() {
       </td>
     `;
 
-    tr.querySelector('.select-product-check').addEventListener('change', updateBulkDiscountBarVisibility);
-
-    // Artırma Butonu Olayı
-    tr.querySelector('.inc-btn').addEventListener('click', (e) => {
-      const btn = e.target.closest('.stepper-btn');
-      const key = btn.getAttribute('data-key');
-      const qtyInput = document.getElementById(`qty-${key}`);
-      let val = parseInt(qtyInput.value, 10);
-      if (isNaN(val)) val = 1;
-      qtyInput.value = val + 1;
-    });
-
-    // Azaltma Butonu Olayı
-    tr.querySelector('.dec-btn').addEventListener('click', (e) => {
-      const btn = e.target.closest('.stepper-btn');
-      const key = btn.getAttribute('data-key');
-      const qtyInput = document.getElementById(`qty-${key}`);
-      let val = parseInt(qtyInput.value, 10);
-      if (isNaN(val)) val = 1;
-      if (val > 1) {
-        qtyInput.value = val - 1;
-      }
-    });
-
-    // Tıklanınca Tümünü Seç Olayı
-    tr.querySelector('.qty-input-table').addEventListener('focus', (e) => {
-      e.target.select();
-    });
-
-    tr.querySelector('.add-cart-btn-table').addEventListener('click', (e) => {
-      const btn = e.target.closest('.add-cart-btn-table');
-      const key = btn.getAttribute('data-key');
-      const qtyInput = document.getElementById(`qty-${key}`);
-      const qty = parseInt(qtyInput.value, 10);
-      if (isNaN(qty) || qty <= 0) return;
-
-      addToSharedCart(product, qty, btn);
-    });
-
-    container.appendChild(tr);
+    fragment.appendChild(tr);
   });
 
+  container.appendChild(fragment);
   updateBulkDiscountBarVisibility();
 }
 

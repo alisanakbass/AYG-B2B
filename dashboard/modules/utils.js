@@ -155,22 +155,33 @@ export function getProductTypeName(name) {
   return clean;
 }
 
-// En yakın görseli arayan algoritma
+// O(1) Hızlı arama için Görsel Haritasını önceden oluştur
+const firatExactMap = new Map();
+FIRAT_IMAGES.forEach(filename => {
+  const dotIndex = filename.indexOf('.');
+  if (dotIndex !== -1) {
+    firatExactMap.set(filename.substring(0, dotIndex), filename);
+  }
+});
+
+// En yakın görseli arayan algoritma (O(1) Önbellekli)
 export function getFiratProductImage(code) {
   if (!code) return '../logo.png';
   const cleanCode = code.toString().trim();
   const IMAGE_BASE_URL = 'https://cdn.jsdelivr.net/gh/alisanakbass/AYG-B2B@main/images/';
 
-  // 1. Tam eşleşme (Exact Match)
-  const exact = FIRAT_IMAGES.find(f => f.startsWith(cleanCode + '.'));
+  // 1. Tam eşleşme (Exact Match - O(1))
+  const exact = firatExactMap.get(cleanCode);
   if (exact) return IMAGE_BASE_URL + exact;
 
   // 2. Ölçü farkından dolayı en yakın grup görselini bul (En uzun ortak önek)
   for (let len = cleanCode.length - 1; len >= 4; len--) {
     const prefix = cleanCode.substring(0, len);
-    const match = FIRAT_IMAGES.find(f => f.startsWith(prefix));
-    if (match) {
-      return IMAGE_BASE_URL + match;
+    // Önceden haritalanmış görsel var mı?
+    for (const [imgCode, filename] of firatExactMap.entries()) {
+      if (imgCode.startsWith(prefix)) {
+        return IMAGE_BASE_URL + filename;
+      }
     }
   }
 

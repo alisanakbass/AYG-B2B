@@ -338,14 +338,21 @@ export async function exportCartAsExcelOffer(presetTeklifNo, metadata, customIte
     return;
   }
 
-  // AYG_TEKLİF.xlsx şablonunu eklenti içinden yükle
+let cachedTemplateArrayBuffer = null;
+async function getTeklifTemplateArrayBuffer() {
+  if (cachedTemplateArrayBuffer) {
+    return cachedTemplateArrayBuffer.slice(0);
+  }
   const fileUrl = chrome.runtime.getURL("AYG_TEKLİF.xlsx");
   const response = await fetch(fileUrl);
   if (!response.ok) {
     throw new Error(`Teklif şablonu (AYG_TEKLİF.xlsx) yüklenemedi: ${response.status}`);
   }
+  cachedTemplateArrayBuffer = await response.arrayBuffer();
+  return cachedTemplateArrayBuffer.slice(0);
+}
 
-  const arrayBuffer = await response.arrayBuffer();
+  const arrayBuffer = await getTeklifTemplateArrayBuffer();
   
   // JSZip ile zip dosyasını yükle
   const zip = new JSZip();

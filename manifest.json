@@ -59,7 +59,8 @@
         "dashboard/dashboard.js",
         "dashboard/dashboard.css",
         "dashboard/modules/*",
-        "images/*"
+        "images/*",
+        "*.xlsx"
       ],
       "matches": ["<all_urls>"]
     }

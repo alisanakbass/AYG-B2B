@@ -1,6 +1,6 @@
 import { state, DEFAULT_URLS } from './modules/state.js';
 import { formatPrice, getSourceKeyFromDomain, calculateSellingPrice } from './modules/utils.js';
-import { initDiscounts, calculateTotalDiscountForProduct, renderKeywordDiscountRules, renderProductDiscountRules, reapplyAllDiscounts } from './modules/discounts.js';
+import { initDiscounts, calculateTotalDiscountForProduct, renderKeywordDiscountRules, renderRangeDiscountRules, renderProductDiscountRules, reapplyAllDiscounts } from './modules/discounts.js';
 import { renderCart, renderReports, confirmCart, submitCart, salesHistoryPageIndex, setSalesHistoryPageIndex, salesFilters, transferCartToAygOrder, sendProductToAygOrder } from './modules/cart.js';
 import { loadFiratStats, loadDefaultExcelIfEmpty, setupExcelListeners } from './modules/excel.js';
 import { checkUpdates, checkAllSessions, executeSearch, recalculateAllResults, applySorting, renderResults, updateBulkDiscountBarVisibility } from './modules/search.js';
@@ -109,6 +109,7 @@ async function loadSettings() {
       url_site_h: DEFAULT_URLS.url_site_h,
       productDiscounts: {},
       keywordDiscounts: [],
+      priceRangeDiscounts: [],
       cred_user_site_a: "info@aygunleryapi.com",
       cred_pass_site_a: "FZ0DT1YL*0OE",
       cred_user_site_b: "120 08 1401",
@@ -156,6 +157,7 @@ async function loadSettings() {
       };
       state.currentProductDiscounts = items.productDiscounts || {};
       state.keywordDiscounts = items.keywordDiscounts || [];
+      state.priceRangeDiscounts = items.priceRangeDiscounts || [];
 
       const modalMargin = document.getElementById('modal-margin');
       if (modalMargin) modalMargin.value = items.margin;
@@ -213,6 +215,7 @@ async function loadSettings() {
       if (cPassH) cPassH.value = items.cred_pass_site_h || "662732";
 
       renderKeywordDiscountRules();
+      renderRangeDiscountRules();
       renderProductDiscountRules();
 
       resolve();
@@ -877,13 +880,71 @@ function setupUIEventListeners() {
       };
 
       state.keywordDiscounts.push(newRule);
-      chrome.storage.sync.set({ keywordDiscounts: state.keywordDiscounts }, () => {
+      const saveCb = () => {
         kwInput.value = '';
         discInput.value = '';
         renderKeywordDiscountRules();
         reapplyAllDiscounts();
         alert(`"${keyword}" kelimesi için %${discount} iskonto kuralı başarıyla eklendi!`);
-      });
+      };
+
+      if (typeof chrome !== 'undefined' && chrome?.storage?.sync) {
+        chrome.storage.sync.set({ keywordDiscounts: state.keywordDiscounts }, saveCb);
+      } else {
+        saveCb();
+      }
+    });
+  }
+
+  // Yeni Fiyat Aralığına Göre İskonto Kuralı Ekle
+  const addRangeRuleBtn = document.getElementById('add-range-rule-btn');
+  if (addRangeRuleBtn) {
+    addRangeRuleBtn.addEventListener('click', () => {
+      const minInput = document.getElementById('new-range-min');
+      const maxInput = document.getElementById('new-range-max');
+      const discInput = document.getElementById('new-range-discount');
+
+      const minVal = minInput.value !== '' ? parseFloat(minInput.value) : 0;
+      const maxVal = maxInput.value !== '' ? parseFloat(maxInput.value) : null;
+      const discount = parseFloat(discInput.value);
+
+      if (isNaN(discount) || discount < 0 || discount > 100) {
+        alert("Lütfen 0 ile 100 arasında geçerli bir iskonto oranı girin.");
+        return;
+      }
+      if (minVal < 0) {
+        alert("Minimum fiyat 0 veya daha büyük olmalıdır.");
+        return;
+      }
+      if (maxVal !== null && maxVal < minVal) {
+        alert("Maksimum fiyat, minimum fiyattan küçük olamaz.");
+        return;
+      }
+
+      const newRule = {
+        id: 'range_rule_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        min: minVal,
+        max: maxVal,
+        discount: discount
+      };
+
+      if (!state.priceRangeDiscounts) state.priceRangeDiscounts = [];
+      state.priceRangeDiscounts.push(newRule);
+
+      const saveCb = () => {
+        minInput.value = '';
+        maxInput.value = '';
+        discInput.value = '';
+        renderRangeDiscountRules();
+        reapplyAllDiscounts();
+        alert(`Fiyat aralığı (%${discount}) iskonto kuralı başarıyla eklendi!`);
+      };
+
+      if (typeof chrome !== 'undefined' && chrome?.storage?.sync) {
+        chrome.storage.sync.set({ priceRangeDiscounts: state.priceRangeDiscounts }, saveCb);
+      } else {
+        saveCb();
+      }
     });
   }
 

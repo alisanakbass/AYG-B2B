@@ -129,10 +129,16 @@ export function renderKeywordDiscountRules() {
     tr.innerHTML = `
       <td style="font-weight: 600; text-align: left; padding: 8px 12px;">${escapeHtml(rule.keyword)}</td>
       <td style="color: var(--primary); font-weight: 700; text-align: left; padding: 8px 12px;">%${rule.discount}</td>
-      <td style="text-align: left; padding: 8px 12px;">
+      <td style="text-align: left; padding: 8px 12px; white-space: nowrap;">
+        <button class="edit-kw-rule-btn primary-btn" data-id="${rule.id}" style="padding: 4px 10px; font-size: 11px; margin-right: 4px;">Düzenle</button>
         <button class="delete-rule-btn delete-sale-btn" data-id="${rule.id}">Sil</button>
       </td>
     `;
+
+    tr.querySelector('.edit-kw-rule-btn').addEventListener('click', (e) => {
+      const id = e.target.getAttribute('data-id');
+      editKeywordDiscountRule(id);
+    });
 
     tr.querySelector('.delete-rule-btn').addEventListener('click', (e) => {
       const id = e.target.getAttribute('data-id');
@@ -141,6 +147,44 @@ export function renderKeywordDiscountRules() {
 
     rowsContainer.appendChild(tr);
   });
+}
+
+// Kelime Bazlı İskonto Kuralını Düzenle
+export function editKeywordDiscountRule(ruleId) {
+  const rule = state.keywordDiscounts.find(r => r.id === ruleId);
+  if (!rule) return;
+
+  const newKw = prompt("Kelime (örn. BOSCH):", rule.keyword);
+  if (newKw === null) return;
+
+  const newDiscStr = prompt("İskonto (%):", rule.discount);
+  if (newDiscStr === null) return;
+
+  const keyword = newKw.trim();
+  const discVal = parseFloat(newDiscStr);
+
+  if (!keyword) {
+    alert("Lütfen geçerli bir kelime girin.");
+    return;
+  }
+  if (isNaN(discVal) || discVal < 0 || discVal > 100) {
+    alert("Lütfen 0 ile 100 arasında geçerli bir iskonto oranı girin.");
+    return;
+  }
+
+  rule.keyword = keyword;
+  rule.discount = discVal;
+
+  const updateCb = () => {
+    renderKeywordDiscountRules();
+    reapplyAllDiscounts();
+  };
+
+  if (typeof chrome !== 'undefined' && chrome?.storage?.sync) {
+    chrome.storage.sync.set({ keywordDiscounts: state.keywordDiscounts }, updateCb);
+  } else {
+    updateCb();
+  }
 }
 
 // Kelime Bazlı İskonto Kuralını Sil
@@ -184,10 +228,16 @@ export function renderRangeDiscountRules() {
       <td style="font-weight: 600; text-align: left; padding: 8px 12px;">${escapeHtml(minText)}</td>
       <td style="font-weight: 600; text-align: left; padding: 8px 12px;">${escapeHtml(maxText)}</td>
       <td style="color: var(--primary); font-weight: 700; text-align: left; padding: 8px 12px;">%${rule.discount}</td>
-      <td style="text-align: left; padding: 8px 12px;">
+      <td style="text-align: left; padding: 8px 12px; white-space: nowrap;">
+        <button class="edit-range-rule-btn primary-btn" data-id="${rule.id}" style="padding: 4px 10px; font-size: 11px; margin-right: 4px;">Düzenle</button>
         <button class="delete-range-rule-btn delete-sale-btn" data-id="${rule.id}">Sil</button>
       </td>
     `;
+
+    tr.querySelector('.edit-range-rule-btn').addEventListener('click', (e) => {
+      const id = e.target.getAttribute('data-id');
+      editRangeDiscountRule(id);
+    });
 
     tr.querySelector('.delete-range-rule-btn').addEventListener('click', (e) => {
       const id = e.target.getAttribute('data-id');
@@ -196,6 +246,57 @@ export function renderRangeDiscountRules() {
 
     rowsContainer.appendChild(tr);
   });
+}
+
+// Fiyat Aralığı İskonto Kuralını Düzenle
+export function editRangeDiscountRule(ruleId) {
+  const rule = state.priceRangeDiscounts.find(r => r.id === ruleId);
+  if (!rule) return;
+
+  const currentMin = rule.min !== undefined && rule.min !== null && rule.min !== '' ? rule.min : 0;
+  const currentMax = rule.max !== undefined && rule.max !== null && rule.max !== '' ? rule.max : '';
+  const currentDisc = rule.discount !== undefined ? rule.discount : 0;
+
+  const newMinStr = prompt("Minimum Fiyat (TL):", currentMin);
+  if (newMinStr === null) return;
+
+  const newMaxStr = prompt("Maksimum Fiyat (TL - Sınırsız için boş bırakın):", currentMax);
+  if (newMaxStr === null) return;
+
+  const newDiscStr = prompt("İskonto (%):", currentDisc);
+  if (newDiscStr === null) return;
+
+  const minVal = newMinStr.trim() !== '' ? parseFloat(newMinStr) : 0;
+  const maxVal = newMaxStr.trim() !== '' ? parseFloat(newMaxStr) : null;
+  const discVal = parseFloat(newDiscStr);
+
+  if (isNaN(minVal) || minVal < 0) {
+    alert("Lütfen geçerli bir minimum fiyat girin.");
+    return;
+  }
+  if (maxVal !== null && (isNaN(maxVal) || maxVal < minVal)) {
+    alert("Maksimum fiyat, minimum fiyattan büyük olmalıdır.");
+    return;
+  }
+  if (isNaN(discVal) || discVal < 0 || discVal > 100) {
+    alert("Lütfen 0 ile 100 arasında geçerli bir iskonto oranı girin.");
+    return;
+  }
+
+  rule.min = minVal;
+  rule.max = maxVal;
+  rule.discount = discVal;
+
+  const updateCb = () => {
+    renderRangeDiscountRules();
+    reapplyAllDiscounts();
+  };
+
+  if (typeof chrome !== 'undefined' && chrome?.storage?.sync) {
+    chrome.storage.sync.set({ priceRangeDiscounts: state.priceRangeDiscounts }, updateCb);
+  } else {
+    updateCb();
+  }
 }
 
 // Fiyat Aralığı İskonto Kuralını Sil
@@ -295,10 +396,16 @@ export function renderTieredMarginRules() {
       <td style="font-weight: 600; text-align: left; padding: 8px 12px;">${escapeHtml(minText)}</td>
       <td style="font-weight: 600; text-align: left; padding: 8px 12px;">${escapeHtml(maxText)}</td>
       <td style="color: #3b82f6; font-weight: 700; text-align: left; padding: 8px 12px;">%${tier.margin}</td>
-      <td style="text-align: left; padding: 8px 12px;">
+      <td style="text-align: left; padding: 8px 12px; white-space: nowrap;">
+        <button class="edit-tier-rule-btn primary-btn" data-id="${tier.id}" style="padding: 4px 10px; font-size: 11px; margin-right: 4px;">Düzenle</button>
         <button class="delete-tier-rule-btn delete-sale-btn" data-id="${tier.id}">Sil</button>
       </td>
     `;
+
+    tr.querySelector('.edit-tier-rule-btn').addEventListener('click', (e) => {
+      const id = e.target.getAttribute('data-id');
+      editTieredMarginRule(id);
+    });
 
     tr.querySelector('.delete-tier-rule-btn').addEventListener('click', (e) => {
       const id = e.target.getAttribute('data-id');
@@ -307,6 +414,57 @@ export function renderTieredMarginRules() {
 
     rowsContainer.appendChild(tr);
   });
+}
+
+// Kademeli Dinamik Kâr Marjı Kuralını Düzenle
+export function editTieredMarginRule(tierId) {
+  const tier = state.tieredMargins.find(t => t.id === tierId);
+  if (!tier) return;
+
+  const currentMin = tier.min !== undefined && tier.min !== null && tier.min !== '' ? tier.min : 0;
+  const currentMax = tier.max !== undefined && tier.max !== null && tier.max !== '' ? tier.max : '';
+  const currentMargin = tier.margin !== undefined ? tier.margin : 40;
+
+  const newMinStr = prompt("Minimum Alış Fiyatı (TL):", currentMin);
+  if (newMinStr === null) return;
+
+  const newMaxStr = prompt("Maksimum Alış Fiyatı (TL - Sınırsız için boş bırakın):", currentMax);
+  if (newMaxStr === null) return;
+
+  const newMarginStr = prompt("Kâr Marjı (%):", currentMargin);
+  if (newMarginStr === null) return;
+
+  const minVal = newMinStr.trim() !== '' ? parseFloat(newMinStr) : 0;
+  const maxVal = newMaxStr.trim() !== '' ? parseFloat(newMaxStr) : null;
+  const marginVal = parseFloat(newMarginStr);
+
+  if (isNaN(minVal) || minVal < 0) {
+    alert("Lütfen geçerli bir minimum fiyat girin.");
+    return;
+  }
+  if (maxVal !== null && (isNaN(maxVal) || maxVal < minVal)) {
+    alert("Maksimum fiyat, minimum fiyattan büyük olmalıdır.");
+    return;
+  }
+  if (isNaN(marginVal) || marginVal < 0) {
+    alert("Lütfen geçerli bir marj oranı girin.");
+    return;
+  }
+
+  tier.min = minVal;
+  tier.max = maxVal;
+  tier.margin = marginVal;
+
+  const updateCb = () => {
+    renderTieredMarginRules();
+    reapplyAllDiscounts();
+  };
+
+  if (typeof chrome !== 'undefined' && chrome?.storage?.sync) {
+    chrome.storage.sync.set({ tieredMargins: state.tieredMargins }, updateCb);
+  } else {
+    updateCb();
+  }
 }
 
 // Kademeli Dinamik Kâr Marjı Kuralını Sil

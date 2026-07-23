@@ -1,6 +1,6 @@
 import { state, DEFAULT_URLS } from './modules/state.js';
 import { formatPrice, getSourceKeyFromDomain, calculateSellingPrice } from './modules/utils.js';
-import { initDiscounts, calculateTotalDiscountForProduct, renderKeywordDiscountRules, renderRangeDiscountRules, renderProductDiscountRules, reapplyAllDiscounts } from './modules/discounts.js';
+import { initDiscounts, calculateTotalDiscountForProduct, renderKeywordDiscountRules, renderRangeDiscountRules, renderProductDiscountRules, renderTieredMarginRules, reapplyAllDiscounts } from './modules/discounts.js';
 import { renderCart, renderReports, confirmCart, submitCart, salesHistoryPageIndex, setSalesHistoryPageIndex, salesFilters, transferCartToAygOrder, sendProductToAygOrder } from './modules/cart.js';
 import { loadFiratStats, loadDefaultExcelIfEmpty, setupExcelListeners } from './modules/excel.js';
 import { checkUpdates, checkAllSessions, executeSearch, recalculateAllResults, applySorting, renderResults, updateBulkDiscountBarVisibility } from './modules/search.js';
@@ -110,6 +110,8 @@ async function loadSettings() {
       productDiscounts: {},
       keywordDiscounts: [],
       priceRangeDiscounts: [],
+      marginMode: 'tiered',
+      tieredMargins: [],
       cred_user_site_a: "info@aygunleryapi.com",
       cred_pass_site_a: "FZ0DT1YL*0OE",
       cred_user_site_b: "120 08 1401",
@@ -158,6 +160,18 @@ async function loadSettings() {
       state.currentProductDiscounts = items.productDiscounts || {};
       state.keywordDiscounts = items.keywordDiscounts || [];
       state.priceRangeDiscounts = items.priceRangeDiscounts || [];
+      state.marginMode = items.marginMode || 'tiered';
+      if (items.tieredMargins && items.tieredMargins.length > 0) {
+        state.tieredMargins = items.tieredMargins;
+      }
+
+      const radioTiered = document.getElementById('margin-mode-tiered');
+      const radioFlat = document.getElementById('margin-mode-flat');
+      if (state.marginMode === 'flat') {
+        if (radioFlat) radioFlat.checked = true;
+      } else {
+        if (radioTiered) radioTiered.checked = true;
+      }
 
       const modalMargin = document.getElementById('modal-margin');
       if (modalMargin) modalMargin.value = items.margin;
@@ -216,6 +230,7 @@ async function loadSettings() {
 
       renderKeywordDiscountRules();
       renderRangeDiscountRules();
+      renderTieredMarginRules();
       renderProductDiscountRules();
 
       resolve();
@@ -942,6 +957,76 @@ function setupUIEventListeners() {
 
       if (typeof chrome !== 'undefined' && chrome?.storage?.sync) {
         chrome.storage.sync.set({ priceRangeDiscounts: state.priceRangeDiscounts }, saveCb);
+      } else {
+        saveCb();
+      }
+    });
+  }
+
+  // Marj Modu Değişimi Dinleyicisi
+  const marginModeRadios = document.querySelectorAll('input[name="margin-mode"]');
+  marginModeRadios.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      state.marginMode = e.target.value;
+      const saveCb = () => {
+        recalculateAllResults();
+        reapplyAllDiscounts();
+      };
+      if (typeof chrome !== 'undefined' && chrome?.storage?.sync) {
+        chrome.storage.sync.set({ marginMode: state.marginMode }, saveCb);
+      } else {
+        saveCb();
+      }
+    });
+  });
+
+  // Yeni Kademeli Dinamik Kâr Marjı Kuralı Ekle
+  const addTierRuleBtn = document.getElementById('add-tier-rule-btn');
+  if (addTierRuleBtn) {
+    addTierRuleBtn.addEventListener('click', () => {
+      const minInput = document.getElementById('new-tier-min');
+      const maxInput = document.getElementById('new-tier-max');
+      const marginInput = document.getElementById('new-tier-margin');
+
+      const minVal = minInput.value !== '' ? parseFloat(minInput.value) : 0;
+      const maxVal = maxInput.value !== '' ? parseFloat(maxInput.value) : null;
+      const margin = parseFloat(marginInput.value);
+
+      if (isNaN(margin) || margin < 0) {
+        alert("Lütfen geçerli bir marj oranı girin.");
+        return;
+      }
+      if (minVal < 0) {
+        alert("Minimum alış fiyatı 0 veya daha büyük olmalıdır.");
+        return;
+      }
+      if (maxVal !== null && maxVal < minVal) {
+        alert("Maksimum fiyat, minimum fiyattan küçük olamaz.");
+        return;
+      }
+
+      const newTier = {
+        id: 'tier_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        min: minVal,
+        max: maxVal,
+        margin: margin
+      };
+
+      if (!state.tieredMargins) state.tieredMargins = [];
+      state.tieredMargins.push(newTier);
+
+      const saveCb = () => {
+        minInput.value = '';
+        maxInput.value = '';
+        marginInput.value = '';
+        renderTieredMarginRules();
+        recalculateAllResults();
+        reapplyAllDiscounts();
+        alert(`Kâr marjı (%${margin}) kademesi başarıyla eklendi!`);
+      };
+
+      if (typeof chrome !== 'undefined' && chrome?.storage?.sync) {
+        chrome.storage.sync.set({ tieredMargins: state.tieredMargins }, saveCb);
       } else {
         saveCb();
       }

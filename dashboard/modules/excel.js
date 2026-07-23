@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { parsePrice, cleanTurkishForSearch, getProductTypeName, getSafeFilename, getSourceKeyFromDomain, calculateSellingPrice } from './utils.js';
+import { parsePrice, cleanTurkishForSearch, getProductTypeName, getSafeFilename, getSourceKeyFromDomain, calculateSellingPrice, getEffectiveMargin } from './utils.js';
 import { updateStatusIndicator } from './search.js';
 import { calculateTotalDiscountForProduct } from './discounts.js';
 
@@ -585,7 +585,7 @@ async function getTeklifTemplateArrayBuffer() {
     // Fiyat ve indirim hesaplamaları
     const sourceKey = item.sourceKey || getSourceKeyFromDomain(item.domain);
     const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
-    const margin = state.siteMargins[sourceKey] !== undefined ? state.siteMargins[sourceKey] : state.currentMargin;
+    const margin = getEffectiveMargin(item.basePrice, sourceKey);
     
     // KDV'li veya KDV'siz (karsız alış) birim satış fiyatı
     const rawUnitPriceNoVat = includeVat 

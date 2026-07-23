@@ -10,6 +10,14 @@ export const state = {
   selectedFilterSite: 'ALL', // Aktif filtrelenen site key (örn: SITE_C veya ALL)
   currentProductDiscounts: {}, // Ürün bazlı özel kalıcı iskontolar {productKey: {name, discount, domain}}
   keywordDiscounts: [], // Kelime bazlı otomatik iskontolar [{id, keyword, discount}]
+  marginMode: 'tiered', // 'tiered' veya 'flat'
+  tieredMargins: [
+    { id: 'tier_1', min: 0, max: 100, margin: 45 },
+    { id: 'tier_2', min: 100, max: 1000, margin: 30 },
+    { id: 'tier_3', min: 1000, max: 5000, margin: 20 },
+    { id: 'tier_4', min: 5000, max: 20000, margin: 15 },
+    { id: 'tier_5', min: 20000, max: null, margin: 10 }
+  ],
   priceRangeDiscounts: [], // Fiyat aralığına göre iskontolar [{id, min, max, discount}]
   salesHistory: [], // Satış geçmişi
   exchangeRates: {

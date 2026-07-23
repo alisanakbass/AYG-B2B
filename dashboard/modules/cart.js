@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { getSourceKeyFromDomain, calculateSellingPrice, formatPrice, escapeHtml } from './utils.js';
+import { getSourceKeyFromDomain, calculateSellingPrice, getEffectiveMargin, formatPrice, escapeHtml } from './utils.js';
 import { calculateTotalDiscountForProduct } from './discounts.js';
 
 export let salesHistoryPageIndex = 0;
@@ -201,7 +201,7 @@ export function renderCart() {
     const sourceKey = item.sourceKey || getSourceKeyFromDomain(item.domain);
     const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
 
-    const margin = state.siteMargins[sourceKey] !== undefined ? state.siteMargins[sourceKey] : state.currentMargin;
+    const margin = getEffectiveMargin(item.basePrice, sourceKey);
     const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false);
     const rawUnitPriceWithVat = calculateSellingPrice(item.basePrice, margin, true);
 
@@ -373,7 +373,7 @@ export function confirmCart() {
     const sourceKey = item.sourceKey || getSourceKeyFromDomain(item.domain);
     const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
 
-    const margin = state.siteMargins[sourceKey] !== undefined ? state.siteMargins[sourceKey] : state.currentMargin;
+    const margin = getEffectiveMargin(item.basePrice, sourceKey);
     const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false);
     const rawUnitPriceWithVat = calculateSellingPrice(item.basePrice, margin, true);
 
@@ -468,7 +468,7 @@ export function submitCart(onSuccess) {
     const sourceKey = item.sourceKey || getSourceKeyFromDomain(item.domain);
     const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
 
-    const margin = state.siteMargins[sourceKey] !== undefined ? state.siteMargins[sourceKey] : state.currentMargin;
+    const margin = getEffectiveMargin(item.basePrice, sourceKey);
     const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false);
     const rawUnitPriceWithVat = calculateSellingPrice(item.basePrice, margin, true);
 

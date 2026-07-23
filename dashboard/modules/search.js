@@ -1,5 +1,5 @@
 import { state, DEFAULT_URLS } from './state.js';
-import { parsePrice, formatPrice, parsePackQuantityFromName, calculateSellingPrice, extractImageUrl, getSourceKeyFromDomain, escapeHtml } from './utils.js';
+import { parsePrice, formatPrice, parsePackQuantityFromName, calculateSellingPrice, getEffectiveMargin, extractImageUrl, getSourceKeyFromDomain, escapeHtml } from './utils.js';
 import { calculateTotalDiscountForProduct } from './discounts.js';
 import { addToSharedCart } from './cart.js';
 
@@ -1455,7 +1455,7 @@ function setupResultsTableDelegation(container) {
     const purchaseNoVat = product.basePrice;
     const purchaseWithVat = product.basePrice * 1.20;
 
-    const margin = state.siteMargins[product.sourceKey] !== undefined ? state.siteMargins[product.sourceKey] : state.currentMargin;
+    const margin = getEffectiveMargin(product.basePrice, product.sourceKey);
     const rawSellingNoVat = calculateSellingPrice(product.basePrice, margin, false);
     const rawSellingWithVat = calculateSellingPrice(product.basePrice, margin, true);
 
@@ -1580,7 +1580,7 @@ export function recalculateAllResults() {
     const purchaseNoVat = product.basePrice;
     const purchaseWithVat = product.basePrice * 1.20;
 
-    const margin = state.siteMargins[product.sourceKey] !== undefined ? state.siteMargins[product.sourceKey] : state.currentMargin;
+    const margin = getEffectiveMargin(product.basePrice, product.sourceKey);
     const rawSellingNoVat = calculateSellingPrice(product.basePrice, margin, false);
     const rawSellingWithVat = calculateSellingPrice(product.basePrice, margin, true);
 

@@ -267,3 +267,61 @@ export function deleteProductDiscountRule(productKey) {
     }
   }
 }
+
+// Kademeli Dinamik Kâr Marjı Kurallarını Tabloya Çiz
+export function renderTieredMarginRules() {
+  const rowsContainer = document.getElementById('tiered-margin-rules-rows');
+  if (!rowsContainer) return;
+
+  if (!state.tieredMargins || state.tieredMargins.length === 0) {
+    rowsContainer.innerHTML = `
+      <tr>
+        <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 8px;">Kayıtlı marj kademesi bulunmuyor.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  // Min fiyata göre sırala
+  const sortedTiers = [...state.tieredMargins].sort((a, b) => (parseFloat(a.min) || 0) - (parseFloat(b.min) || 0));
+
+  rowsContainer.innerHTML = '';
+  sortedTiers.forEach(tier => {
+    const tr = document.createElement('tr');
+    const minText = tier.min !== undefined && tier.min !== null && tier.min !== '' ? `${tier.min} TL` : '0 TL';
+    const maxText = tier.max !== undefined && tier.max !== null && tier.max !== '' ? `${tier.max} TL` : 'Sınırsız';
+
+    tr.innerHTML = `
+      <td style="font-weight: 600; text-align: left; padding: 8px 12px;">${escapeHtml(minText)}</td>
+      <td style="font-weight: 600; text-align: left; padding: 8px 12px;">${escapeHtml(maxText)}</td>
+      <td style="color: #3b82f6; font-weight: 700; text-align: left; padding: 8px 12px;">%${tier.margin}</td>
+      <td style="text-align: left; padding: 8px 12px;">
+        <button class="delete-tier-rule-btn delete-sale-btn" data-id="${tier.id}">Sil</button>
+      </td>
+    `;
+
+    tr.querySelector('.delete-tier-rule-btn').addEventListener('click', (e) => {
+      const id = e.target.getAttribute('data-id');
+      deleteTieredMarginRule(id);
+    });
+
+    rowsContainer.appendChild(tr);
+  });
+}
+
+// Kademeli Dinamik Kâr Marjı Kuralını Sil
+export function deleteTieredMarginRule(tierId) {
+  if (confirm("Bu marj kademesini silmek istediğinize emin misiniz?")) {
+    state.tieredMargins = (state.tieredMargins || []).filter(tier => tier.id !== tierId);
+    const updateCb = () => {
+      renderTieredMarginRules();
+      reapplyAllDiscounts();
+    };
+
+    if (typeof chrome !== 'undefined' && chrome?.storage?.sync) {
+      chrome.storage.sync.set({ tieredMargins: state.tieredMargins }, updateCb);
+    } else {
+      updateCb();
+    }
+  }
+}

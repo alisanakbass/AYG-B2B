@@ -1,4 +1,4 @@
-import { FIRAT_IMAGES } from './state.js';
+import { state, FIRAT_IMAGES } from './state.js';
 
 // Fiyat Ayrıştırma
 export function parsePrice(priceStr) {
@@ -11,6 +11,33 @@ export function parsePrice(priceStr) {
   }
   const val = parseFloat(cleanStr);
   return isNaN(val) ? 0 : val;
+}
+
+// Etkin Kâr Marjını Hesaplama (Sabit vs Kademeli Marj Modu)
+export function getEffectiveMargin(basePrice, sourceKey) {
+  if (state.marginMode === 'tiered' && state.tieredMargins && state.tieredMargins.length > 0) {
+    const price = parseFloat(basePrice) || 0;
+    let matchedMargin = null;
+
+    state.tieredMargins.forEach(tier => {
+      const min = tier.min !== undefined && tier.min !== null && tier.min !== '' ? parseFloat(tier.min) : 0;
+      const max = tier.max !== undefined && tier.max !== null && tier.max !== '' ? parseFloat(tier.max) : Infinity;
+
+      if (price >= min && price <= max) {
+        matchedMargin = tier.margin;
+      }
+    });
+
+    if (matchedMargin !== null) {
+      return matchedMargin;
+    }
+  }
+
+  if (sourceKey && state.siteMargins && state.siteMargins[sourceKey] !== undefined) {
+    return state.siteMargins[sourceKey];
+  }
+
+  return state.currentMargin !== undefined ? state.currentMargin : 40;
 }
 
 // Fiyat Biçimlendirme

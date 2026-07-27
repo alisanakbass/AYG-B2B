@@ -10,8 +10,39 @@ export const PARSERS = {
   SITE_G: {
     name: "Nalburdayım",
     badgeClass: "site_g",
-    rowSelector: null,
-    parseRow: null
+    rowSelector: '.art[role="listitem"], .art.list-border',
+    parseRow: (row, domain) => {
+      const nameEl = row.querySelector('.art-name a') || row.querySelector('.art-name') || row.querySelector('.art-title a');
+      if (!nameEl) return null;
+      const name = (nameEl.getAttribute('title') || nameEl.textContent || '').trim();
+      if (!name) return null;
+
+      const priceEl = row.querySelector('.art-finalprice .art-price-value') || row.querySelector('.art-price-value') || row.querySelector('.art-price');
+      if (!priceEl) return null;
+
+      const rawPrice = parsePrice(priceEl.textContent);
+      if (isNaN(rawPrice) || rawPrice <= 0) return null;
+
+      const basePrice = rawPrice / 1.20; // KDV (%20) hariç taban fiyatı hesaplayalım.
+
+      const linkEl = row.querySelector('.art-name a') || row.querySelector('a');
+      const href = linkEl ? linkEl.getAttribute('href') : '';
+      const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
+      const key = `b2b_${domain.replace(/\./g, '_')}_${cleanName}`;
+
+      let imgUrl = '';
+      const imgEl = row.querySelector('.art-picture-block img') || row.querySelector('.art-picture img') || row.querySelector('img');
+      if (imgEl) {
+        imgUrl = imgEl.getAttribute('data-src') || imgEl.getAttribute('src') || '';
+      }
+      if (imgUrl.startsWith('//')) {
+        imgUrl = 'https:' + imgUrl;
+      } else if (imgUrl.startsWith('/') && !imgUrl.startsWith('//')) {
+        imgUrl = 'https://www.nalburdayim.com' + imgUrl;
+      }
+
+      return { key, name, basePrice, domain, imgUrl, unit: 'ADET', packQuantity: 1 };
+    }
   },
   SITE_F: {
     name: "Fırat Boru",
@@ -1147,70 +1178,6 @@ export async function fetchFromB2B(siteKey, query) {
     }
   }
 
-  // --- NALBURDAYIM (SITE_G) API ENTEGRASYONU ---
-  if (siteKey === 'SITE_G') {
-    const config = PARSERS[siteKey];
-    let itemsFoundCount = 0;
-    try {
-      const apiUrl = `https://api.aisearch.app/sites/2816/v1/search/query?query=${encodeURIComponent(query)}&expand=product%2Cfilter%2CpopularCategories%2Crecommendation&limit=30&attributes=&sort=&user_id=Nph4shd9r1RiNdAg&page=1&client-token=J4vJKeKUKIaNeLskrrFXXwnvqwk74QEp&lang=tr&d=www.nalburdayim.com`;
-
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json, text/plain, */*'
-        }
-      });
-
-      if (!response.ok) throw new Error(`HTTP Hata: ${response.status}`);
-
-      const data = await response.json();
-      const products = data.products || [];
-
-      products.forEach(p => {
-        try {
-          const name = p.name || 'Bilinmeyen Ürün';
-          const rawPrice = parseFloat(p.price) || parseFloat(p.buying_price) || 0;
-          const basePrice = rawPrice / 1.20; // KDV hariç taban fiyatı hesaplayalım.
-
-          const codeId = p.id || p.sku || '';
-          const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
-          const key = `b2b_${domain.replace(/\./g, '_')}_${codeId || cleanName}`;
-
-          let imgUrl = '';
-          if (p.images && p.images.length > 0) {
-            imgUrl = p.images[0];
-          }
-
-          if (basePrice > 0) {
-            const parsedPackQty = parsePackQuantityFromName(name);
-            state.currentResults.push({
-              key,
-              name,
-              basePrice,
-              domain,
-              imgUrl,
-              sourceKey: siteKey,
-              sourceName: config.name,
-              badgeClass: config.badgeClass,
-              unit: parsedPackQty ? 'PAKET' : 'ADET',
-              packQuantity: parsedPackQty || 1
-            });
-            itemsFoundCount++;
-          }
-        } catch (err) {
-          console.error(`[B2B Nalburdayım] Satır işleme hatası:`, err);
-        }
-      });
-
-      updateStatusIndicator(siteKey, 'success', `${itemsFoundCount} Ürün`);
-      if (itemsFoundCount > 0) updateSessionActive(siteKey);
-      return;
-    } catch (apiError) {
-      console.error(`[B2B Portal] Nalburdayım API entegrasyon hatası:`, apiError);
-      updateStatusIndicator(siteKey, 'error', 'Hata Oluştu');
-      return;
-    }
-  }
 
   // --- YAŞAR TEKNİK (SITE_C) HTML YÖNTEMİ ---
   try {

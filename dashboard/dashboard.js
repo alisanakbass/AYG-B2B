@@ -132,7 +132,7 @@ async function loadSettings() {
       if (items.url_site_h === "https://b2b.kamilturk.com/Arama/Arama?q={query}" || !items.url_site_h) {
         items.url_site_h = DEFAULT_URLS.url_site_h;
       }
-      if (items.url_site_g === "https://www.nalburdayim.com/search/?q={query}" || !items.url_site_g) {
+      if (!items.url_site_g || items.url_site_g.includes('aisearch')) {
         items.url_site_g = DEFAULT_URLS.url_site_g;
       }
 

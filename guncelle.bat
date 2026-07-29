@@ -39,20 +39,24 @@ if !ZIPSIZE! LEQ 100 (
 
 echo Dosyalar aciliyor ve guncelleniyor...
 
+:: Önce eski temp_update varsa temizle
+if exist temp_update rd /s /q temp_update 2>nul
+
 :: PowerShell ile zip dosyasını geçici klasöre aç
-powershell -Command "Expand-Archive -Path 'update.zip' -DestinationPath 'temp_update' -Force"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path 'update.zip' -DestinationPath 'temp_update' -Force"
 
 if not exist temp_update (
     echo.
     echo ❌ HATA: Zip dosyasi acilamadi!
-    del update.zip
+    del update.zip 2>nul
     pause
     exit /b
 )
 
 :: Klasorun adini tespit et ve kopyala (Çalışan guncelle.bat dosyasını atlayarak)
 for /d %%i in (temp_update\*) do (
-    robocopy "%%i" ".\" /e /xf "guncelle.bat" /njh /njs /nc /ns /np > nul
+    robocopy "%%i" "." /e /xf "guncelle.bat" /njh /njs /nc /ns /np > nul
+    if not exist "guncelle.bat" copy /y "%%i\guncelle.bat" "guncelle.bat" > nul 2>&1
 )
 
 :: Eski gereksiz kok dosyalarini temizle (Klasör yapısı güncellendiği için)

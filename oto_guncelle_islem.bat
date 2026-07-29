@@ -18,13 +18,14 @@ if %errorlevel% equ 10 (
         for %%I in (update.zip) do set "ZIPSIZE=%%~zI"
         if "!ZIPSIZE!"=="" set "ZIPSIZE=0"
         if !ZIPSIZE! GTR 100 (
-            :: Zip dosyasını aç
-            powershell -Command "try { Expand-Archive -Path 'update.zip' -DestinationPath 'temp_update' -Force } catch { exit 1 }"
+            if exist temp_update rd /s /q temp_update 2>nul
+            powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Expand-Archive -Path 'update.zip' -DestinationPath 'temp_update' -Force } catch { exit 1 }"
             
             if exist temp_update (
                 :: Dosyaları üzerine yaz (Çalışan bat dosyasını atlayarak)
                 for /d %%i in (temp_update\*) do (
-                    robocopy "%%i" ".\" /e /xf "oto_guncelle_islem.bat" /njh /njs /nc /ns /np > nul
+                    robocopy "%%i" "." /e /xf "oto_guncelle_islem.bat" /njh /njs /nc /ns /np > nul
+                    if not exist "oto_guncelle_islem.bat" copy /y "%%i\oto_guncelle_islem.bat" "oto_guncelle_islem.bat" > nul 2>&1
                 )
                 :: Eski gereksiz kok dosyalarini temizle (Klasör yapısı güncellendiği için)
                 del /f /q popup.html popup.js dashboard.html dashboard.js dashboard.css content_token.js content_token_main.js yasar_check.js download_missing_images.js 2>nul

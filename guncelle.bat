@@ -33,9 +33,9 @@ if not exist temp_update (
     exit /b
 )
 
-:: Klasorun adini tespit et ve kopyala
+:: Klasorun adini tespit et ve kopyala (Çalışan bat dosyalarını atlayarak)
 for /d %%i in (temp_update\*) do (
-    xcopy "%%i\*" ".\" /s /e /y > nul
+    robocopy "%%i" ".\" /e /xf "guncelle.bat" "oto_guncelle_islem.bat" /njh /njs /nc /ns /np > nul
 )
 
 :: Eski gereksiz kok dosyalarini temizle (Klasör yapısı güncellendiği için)

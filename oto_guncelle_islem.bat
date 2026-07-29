@@ -15,9 +15,9 @@ if %errorlevel% equ 10 (
         powershell -Command "try { Expand-Archive -Path 'update.zip' -DestinationPath 'temp_update' -Force } catch { exit 1 }"
         
         if exist temp_update (
-            :: Dosyaları üzerine yaz (Çalışan bat dosyalarını atlayarak)
+            :: Dosyaları üzerine yaz (Çalışan bat dosyasını atlayarak)
             for /d %%i in (temp_update\*) do (
-                robocopy "%%i" ".\" /e /xf "guncelle.bat" "oto_guncelle_islem.bat" /njh /njs /nc /ns /np > nul
+                robocopy "%%i" ".\" /e /xf "oto_guncelle_islem.bat" /njh /njs /nc /ns /np > nul
             )
             :: Eski gereksiz kok dosyalarini temizle (Klasör yapısı güncellendiği için)
             del /f /q popup.html popup.js dashboard.html dashboard.js dashboard.css content_token.js content_token_main.js yasar_check.js download_missing_images.js 2>nul

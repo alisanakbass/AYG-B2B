@@ -7,67 +7,25 @@ echo ==========================================
 echo    AYG B2B - OTO GUNCELLEME VE SERVIS KUR
 echo ==========================================
 echo.
-echo Guncel dosyalar GitHub'dan indiriliyor, lutfen bekleyin...
-echo.
 
-:: GitHub'dan zip dosyasını indir (curl veya WebClient ile)
-where curl >nul 2>&1
-if !errorLevel! equ 0 (
-    curl -s -L "https://github.com/alisanakbass/AYG-B2B/archive/refs/heads/main.zip" -o "update.zip"
+if exist "%~dp0tools\do_update.ps1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\do_update.ps1"
 ) else (
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $wc = New-Object System.Net.WebClient; $wc.Headers.Add('User-Agent', 'Mozilla/5.0'); $wc.DownloadFile('https://github.com/alisanakbass/AYG-B2B/archive/refs/heads/main.zip', 'update.zip')"
+    echo Guncel dosyalar GitHub'dan indiriliyor, lutfen bekleyin...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $wc = New-Object System.Net.WebClient; $wc.Headers.Add('User-Agent', 'Mozilla/5.0'); $wc.DownloadFile('https://github.com/alisanakbass/AYG-B2B/archive/refs/heads/main.zip', 'update.zip'); Expand-Archive -Path 'update.zip' -DestinationPath 'temp_update' -Force; $sub = Get-ChildItem 'temp_update' | Where-Object { $_.PSIsContainer } | Select-Object -First 1; Get-ChildItem -Path $sub.FullName -Recurse | ForEach-Object { $rel = $_.FullName.Substring($sub.FullName.Length + 1); $dest = Join-Path (Get-Location).Path $rel; if ($_.PSIsContainer) { if (-not (Test-Path $dest)) { New-Item -ItemType Directory -Path $dest -Force | Out-Null } } else { Copy-Item -Path $_.FullName -Destination $dest -Force } }; Remove-Item -Force 'update.zip' -ErrorAction SilentlyContinue; Remove-Item -Recurse -Force 'temp_update' -ErrorAction SilentlyContinue"
 )
 
-if not exist update.zip (
+if not exist manifest.json (
     echo.
-    echo ❌ HATA: Guncelleme paketi indirilemedi! 
+    echo ❌ HATA: Guncelleme paketi indirilemedi veya dosyalar acilamadi!
     echo Lutfen internet baglantinizi ve GitHub baglantinizi kontrol edin.
     echo.
     pause
     exit /b
 )
 
-for %%I in (update.zip) do set "ZIPSIZE=%%~zI"
-if "!ZIPSIZE!"=="" set "ZIPSIZE=0"
-if !ZIPSIZE! LEQ 100 (
-    echo.
-    echo ❌ HATA: Guncelleme paketi bos indirildi (!ZIPSIZE! byte).
-    del update.zip 2>nul
-    pause
-    exit /b
-)
-
-echo Dosyalar aciliyor ve guncelleniyor...
-
-:: Önce eski temp_update varsa temizle
-if exist temp_update rd /s /q temp_update 2>nul
-
-:: PowerShell ile zip dosyasını geçici klasöre aç
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path 'update.zip' -DestinationPath 'temp_update' -Force"
-
-if not exist temp_update (
-    echo.
-    echo ❌ HATA: Zip dosyasi acilamadi!
-    del update.zip 2>nul
-    pause
-    exit /b
-)
-
-:: Klasorun adini tespit et ve kopyala (Çalışan guncelle.bat dosyasını atlayarak)
-for /d %%i in (temp_update\*) do (
-    robocopy "%%i" "." /e /xf "guncelle.bat" /njh /njs /nc /ns /np > nul
-    if not exist "guncelle.bat" copy /y "%%i\guncelle.bat" "guncelle.bat" > nul 2>&1
-)
-
-:: Eski gereksiz kok dosyalarini temizle (Klasör yapısı güncellendiği için)
-del /f /q popup.html popup.js dashboard.html dashboard.js dashboard.css content_token.js content_token_main.js yasar_check.js download_missing_images.js 2>nul
-
 :: Native Messaging Registry Kaydını Güncelle
 if exist "%~dp0tools\native_kayit.bat" call "%~dp0tools\native_kayit.bat" > nul 2>&1
-
-:: Temizlik
-rd /s /q temp_update
-del update.zip
 
 echo.
 echo ==========================================
@@ -75,7 +33,7 @@ echo    GUNCELLEME BASARIYLA TAMAMLANDI!
 echo ==========================================
 echo.
 echo Eklenti dosyalari guncellendi.
-echo Lutfen Chrome tarayicinizda chrome://extensions adresine gidip eklentiyi YENILE (Refres) yapin.
+echo Lutfen Chrome tarayicinizda chrome://extensions adresine gidip eklentiyi YENILE (Refresh) yapin.
 echo.
 echo ------------------------------------------
 echo.

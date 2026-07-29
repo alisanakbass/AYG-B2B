@@ -18,7 +18,11 @@ if ($bytesRead -eq 4) {
 
     if (Test-Path $batPath) {
         $process = Start-Process -FilePath "cmd.exe" -ArgumentList "/c `"$batPath`"" -Wait -WindowStyle Hidden -PassThru
-        $status = "ok"
+        if ($process.ExitCode -eq 0) {
+            $status = "ok"
+        } else {
+            $status = "error"
+        }
     } else {
         $status = "error"
     }

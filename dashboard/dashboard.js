@@ -2,7 +2,7 @@ import { state, DEFAULT_URLS } from './modules/state.js';
 import { formatPrice, getSourceKeyFromDomain, calculateSellingPrice } from './modules/utils.js';
 import { initDiscounts, calculateTotalDiscountForProduct, renderKeywordDiscountRules, renderRangeDiscountRules, renderProductDiscountRules, renderTieredMarginRules, reapplyAllDiscounts } from './modules/discounts.js';
 import { renderCart, renderReports, confirmCart, submitCart, salesHistoryPageIndex, setSalesHistoryPageIndex, salesFilters, transferCartToAygOrder, sendProductToAygOrder } from './modules/cart.js';
-import { loadFiratStats, loadDefaultExcelIfEmpty, setupExcelListeners } from './modules/excel.js';
+import { loadFiratStats, loadDefaultExcelIfEmpty, setupExcelListeners, downloadBlankTeklifExcel } from './modules/excel.js';
 import { checkUpdates, checkAllSessions, executeSearch, recalculateAllResults, applySorting, renderResults, updateBulkDiscountBarVisibility } from './modules/search.js';
 
 // AYG Sipariş Seçim Modu Algılama
@@ -1301,6 +1301,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             btnNativeUpdate.style.opacity = '1';
           }
         });
+      }
+    });
+  }
+
+  // Boş Teklif Excel İndirme Butonu Dinleyicisi
+  const btnHeaderBlankExcel = document.getElementById('header-blank-excel-btn');
+  if (btnHeaderBlankExcel) {
+    btnHeaderBlankExcel.addEventListener('click', () => {
+      const defaultFilename = 'AYG_TEKLIF_BOS.xlsx';
+      const userInput = prompt('İndirilecek Excel dosyasının adını giriniz:', defaultFilename);
+      if (userInput !== null && userInput.trim() !== '') {
+        downloadBlankTeklifExcel(userInput.trim());
       }
     });
   }

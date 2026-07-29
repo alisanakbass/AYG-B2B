@@ -744,3 +744,37 @@ async function getTeklifTemplateArrayBuffer() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+// Boş Şablon Teklif Excel Dosyasını İndiren Fonksiyon
+export async function downloadBlankTeklifExcel(customFilename) {
+  try {
+    let templateUrl = "../AYG_TEKLİF.xlsx";
+    if (typeof chrome !== 'undefined' && chrome?.runtime?.getURL) {
+      templateUrl = chrome.runtime.getURL("AYG_TEKLİF.xlsx");
+    }
+
+    const response = await fetch(templateUrl);
+    if (!response.ok) {
+      throw new Error(`Teklif şablonu yüklenemedi (HTTP ${response.status})`);
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+
+    let filename = (customFilename || "AYG_TEKLIF_BOS.xlsx").trim();
+    if (!filename.toLowerCase().endsWith(".xlsx")) {
+      filename += ".xlsx";
+    }
+
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error("[B2B Excel] Boş teklif indirme hatası:", err);
+    alert("Boş teklif Excel dosyası indirilirken bir hata oluştu: " + err.message);
+  }
+}

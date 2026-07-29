@@ -10,14 +10,29 @@ echo.
 echo Guncel dosyalar GitHub'dan indiriliyor, lutfen bekleyin...
 echo.
 
-:: PowerShell ile GitHub'daki zip dosyasını indir
-powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://github.com/alisanakbass/AYG-B2B/archive/refs/heads/main.zip' -OutFile 'update.zip'"
+:: GitHub'dan zip dosyasını indir (curl veya WebClient ile)
+where curl >nul 2>&1
+if !errorLevel! equ 0 (
+    curl -s -L "https://github.com/alisanakbass/AYG-B2B/archive/refs/heads/main.zip" -o "update.zip"
+) else (
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $wc = New-Object System.Net.WebClient; $wc.Headers.Add('User-Agent', 'Mozilla/5.0'); $wc.DownloadFile('https://github.com/alisanakbass/AYG-B2B/archive/refs/heads/main.zip', 'update.zip')"
+)
 
 if not exist update.zip (
     echo.
     echo ❌ HATA: Guncelleme paketi indirilemedi! 
     echo Lutfen internet baglantinizi ve GitHub baglantinizi kontrol edin.
     echo.
+    pause
+    exit /b
+)
+
+for %%I in (update.zip) do set "ZIPSIZE=%%~zI"
+if "!ZIPSIZE!"=="" set "ZIPSIZE=0"
+if !ZIPSIZE! LEQ 100 (
+    echo.
+    echo ❌ HATA: Guncelleme paketi bos indirildi (!ZIPSIZE! byte).
+    del update.zip 2>nul
     pause
     exit /b
 )

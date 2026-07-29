@@ -1269,6 +1269,41 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   }
+
+  // Otomatik Güncelleme Kontrolü ve Native Host Tetikleme
+  const updateBanner = document.getElementById('update-notification');
+  const btnNativeUpdate = document.getElementById('btn-do-native-update');
+
+  if (typeof chrome !== 'undefined' && chrome?.runtime?.sendMessage) {
+    chrome.runtime.sendMessage({ action: 'check_github_version' }, (res) => {
+      if (res && res.success && res.hasUpdate) {
+        if (updateBanner) updateBanner.style.display = 'block';
+      }
+    });
+  }
+
+  if (btnNativeUpdate) {
+    btnNativeUpdate.addEventListener('click', () => {
+      btnNativeUpdate.disabled = true;
+      btnNativeUpdate.textContent = '⌛ Güncelleniyor...';
+      btnNativeUpdate.style.opacity = '0.7';
+
+      if (typeof chrome !== 'undefined' && chrome?.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ action: 'trigger_native_update' }, (res) => {
+          if (res && res.success) {
+            btnNativeUpdate.textContent = '✅ Güncellendi! Eklenti Yenileniyor...';
+            btnNativeUpdate.style.background = '#16a34a';
+            btnNativeUpdate.style.color = '#ffffff';
+          } else {
+            alert('Güncelleme başlatılamadı veya Native Host kaydı bulunamadı. Lütfen bir defaya mahsus guncelle.bat dosyasını çalıştırın.\n\nHata: ' + (res?.message || 'Bilinmeyen hata'));
+            btnNativeUpdate.disabled = false;
+            btnNativeUpdate.textContent = '🚀 Şimdi Güncelle (Tek Tık)';
+            btnNativeUpdate.style.opacity = '1';
+          }
+        });
+      }
+    });
+  }
 });
 
 // Görsel yüklenemediğinde çalışan merkezi hata yakalayıcı (CSP Uyumlu & Optimize Edilmiş)

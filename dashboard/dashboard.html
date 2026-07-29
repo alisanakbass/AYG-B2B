@@ -39,19 +39,24 @@
           padding-right: 30px;
         "
       >
-        🔔 <b>Yeni Bir Güncelleme Mevcut!</b> Eklentiyi güncellemek için eklenti
-        klasöründeki
-        <code
+        🔔 <b>Yeni Bir Güncelleme Mevcut!</b> Eklentinizi tek tıkla güncellemek için sağdaki butona tıklayın:
+        <button
+          id="btn-do-native-update"
           style="
-            background: rgba(0, 0, 0, 0.2);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: monospace;
-            font-weight: 600;
+            margin-left: 12px;
+            background: #1e293b;
+            color: #38bdf8;
+            border: 1px solid #38bdf8;
+            padding: 4px 14px;
+            border-radius: 6px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s;
           "
-          >guncelle.bat</code
         >
-        dosyasına çift tıklayın ve ardından bu sayfayı yenileyin.
+          🚀 Şimdi Güncelle (Tek Tık)
+        </button>
       </div>
       <button
         onclick="this.parentElement.style.display = 'none'"

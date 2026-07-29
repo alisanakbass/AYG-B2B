@@ -41,6 +41,9 @@ for /d %%i in (temp_update\*) do (
 :: Eski gereksiz kok dosyalarini temizle (Klasör yapısı güncellendiği için)
 del /f /q popup.html popup.js dashboard.html dashboard.js dashboard.css content_token.js content_token_main.js yasar_check.js download_missing_images.js 2>nul
 
+:: Native Messaging Registry Kaydını Güncelle
+if exist "%~dp0tools\native_kayit.bat" call "%~dp0tools\native_kayit.bat" > nul 2>&1
+
 :: Temizlik
 rd /s /q temp_update
 del update.zip

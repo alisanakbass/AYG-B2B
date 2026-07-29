@@ -124,8 +124,60 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse(results);
     });
     return true;
+  } else if (message.action === "trigger_native_update") {
+    triggerNativeUpdate().then((result) => {
+      sendResponse(result);
+    });
+    return true;
+  } else if (message.action === "check_github_version") {
+    checkGitHubVersion().then((result) => {
+      sendResponse(result);
+    });
+    return true;
   }
 });
+
+// GitHub üzerindeki en güncel versiyonu kontrol etme fonksiyonu
+async function checkGitHubVersion() {
+  try {
+    const res = await fetch("https://raw.githubusercontent.com/alisanakbass/AYG-B2B/main/version.json?t=" + Date.now(), { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      const manifest = chrome.runtime.getManifest();
+      const remoteVersion = data.version;
+      const localVersion = manifest.version;
+      const hasUpdate = remoteVersion !== localVersion;
+      return { success: true, hasUpdate, remoteVersion, localVersion };
+    }
+  } catch (e) {
+    console.error("[B2B Background] Versiyon kontrol hatası:", e);
+  }
+  return { success: false, hasUpdate: false };
+}
+
+// Native Messaging ile guncelle.bat çalıştırıp eklentiyi yenileme fonksiyonu
+async function triggerNativeUpdate() {
+  return new Promise((resolve) => {
+    try {
+      chrome.runtime.sendNativeMessage("com.ayg.b2b.update", { action: "update" }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error("[B2B Background] Native Host hatası:", chrome.runtime.lastError.message);
+          resolve({ success: false, message: chrome.runtime.lastError.message });
+        } else {
+          console.log("[B2B Background] Native Host yanıtı:", response);
+          // Eklentiyi güncellemeden sonra 2.5 saniye içinde otomatik yeniden yükle
+          setTimeout(() => {
+            try { chrome.runtime.reload(); } catch(e){}
+          }, 2500);
+          resolve({ success: true, response });
+        }
+      });
+    } catch (err) {
+      console.error("[B2B Background] Native update tetikleme hatası:", err);
+      resolve({ success: false, message: err.message });
+    }
+  });
+}
 
 // Tüm aktif (işaretli) siteler için otomatik giriş yap
 async function performBackgroundLoginForAll() {

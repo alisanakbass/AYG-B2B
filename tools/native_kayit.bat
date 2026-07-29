@@ -1,12 +1,5 @@
 @echo off
 chcp 65001 > nul
+cd /d "%~dp0"
 
-set "MANIFEST_PATH=%~dp0com.ayg.b2b.update.json"
-
-reg add "HKCU\Software\Google\Chrome\NativeMessagingHosts\com.ayg.b2b.update" /ve /t REG_SZ /d "%MANIFEST_PATH%" /f > nul
-
-if %errorLevel% equ 0 (
-    echo [OK] Chrome Native Messaging kaydi basariyla eklendi!
-) else (
-    echo [HATA] Kayit defteri guncellenirken bir hata olustu.
-)
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0native_kayit.ps1"

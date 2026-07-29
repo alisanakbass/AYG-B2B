@@ -1,9 +1,9 @@
-{
-  "name": "com.ayg.b2b.update",
-  "description": "AYG B2B Auto Update Host",
-  "path": "c:\\Users\\alisa\\OneDrive\\Masaüstü\\b2b_karsilastirma\\tools\\native_host.bat",
-  "type": "stdio",
-  "allowed_origins": [
-    "chrome-extension://jlckalpblajjdjkkbjgipjbeelclfnhm/"
-  ]
+﻿{
+    "name":  "com.ayg.b2b.update",
+    "description":  "AYG B2B Auto Update Host",
+    "path":  "C:\\Users\\alisa\\OneDrive\\Masaüstü\\b2b_karsilastirma\\tools\\native_host.bat",
+    "type":  "stdio",
+    "allowed_origins":  [
+                            "chrome-extension://jlckalpblajjdjkkbjgipjbeelclfnhm/"
+                        ]
 }

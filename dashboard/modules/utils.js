@@ -120,6 +120,7 @@ export function getSourceKeyFromDomain(domain) {
   if (domain.includes('firat') || domain.includes('excel')) return 'SITE_F';
   if (domain.includes('kamilturk')) return 'SITE_H';
   if (domain.includes('tokticaret')) return 'SITE_I';
+  if (domain.includes('duzmetal')) return 'SITE_J';
   return '';
 }
 

@@ -92,6 +92,7 @@ async function loadSettings() {
       margin_site_f: 40,
       margin_site_h: 40,
       margin_site_i: 40,
+      margin_site_j: 40,
       discount_site_a: 0,
       discount_site_b: 0,
       discount_site_c: 0,
@@ -100,6 +101,7 @@ async function loadSettings() {
       discount_site_f: 0,
       discount_site_h: 0,
       discount_site_i: 0,
+      discount_site_j: 0,
       url_site_a: DEFAULT_URLS.url_site_a,
       url_site_b: DEFAULT_URLS.url_site_b,
       url_site_c: DEFAULT_URLS.url_site_c,
@@ -107,6 +109,7 @@ async function loadSettings() {
       url_site_e: DEFAULT_URLS.url_site_e,
       url_site_h: DEFAULT_URLS.url_site_h,
       url_site_i: DEFAULT_URLS.url_site_i,
+      url_site_j: DEFAULT_URLS.url_site_j,
       productDiscounts: {},
       keywordDiscounts: [],
       priceRangeDiscounts: [],
@@ -125,7 +128,10 @@ async function loadSettings() {
       cred_pass_site_h: "662732",
       cred_company_site_i: "M01A02",
       cred_user_site_i: "1",
-      cred_pass_site_i: "AYGUNLER01"
+      cred_pass_site_i: "AYGUNLER01",
+      cred_company_site_j: "MA301",
+      cred_user_site_j: "AYGUNLER",
+      cred_pass_site_j: "MA301"
     };
 
     const processSettings = (items) => {
@@ -135,6 +141,9 @@ async function loadSettings() {
       }
       if (!items.url_site_i) {
         items.url_site_i = DEFAULT_URLS.url_site_i;
+      }
+      if (!items.url_site_j) {
+        items.url_site_j = DEFAULT_URLS.url_site_j;
       }
 
       state.currentMargin = items.margin;
@@ -146,7 +155,8 @@ async function loadSettings() {
         SITE_E: items.margin_site_e,
         SITE_F: items.margin_site_f,
         SITE_H: items.margin_site_h,
-        SITE_I: items.margin_site_i
+        SITE_I: items.margin_site_i,
+        SITE_J: items.margin_site_j
       };
       state.siteDiscounts = {
         SITE_A: items.discount_site_a,
@@ -156,7 +166,8 @@ async function loadSettings() {
         SITE_E: items.discount_site_e,
         SITE_F: items.discount_site_f,
         SITE_H: items.discount_site_h,
-        SITE_I: items.discount_site_i
+        SITE_I: items.discount_site_i,
+        SITE_J: items.discount_site_j
       };
       state.currentProductDiscounts = items.productDiscounts || {};
       state.keywordDiscounts = items.keywordDiscounts || [];
@@ -177,7 +188,7 @@ async function loadSettings() {
       const modalMargin = document.getElementById('modal-margin');
       if (modalMargin) modalMargin.value = items.margin;
 
-      ['a', 'b', 'c', 'd', 'e', 'f', 'h', 'i'].forEach(letter => {
+      ['a', 'b', 'c', 'd', 'e', 'f', 'h', 'i', 'j'].forEach(letter => {
         const key = `SITE_${letter.toUpperCase()}`;
         const mInput = document.getElementById(`margin-site-${letter}`);
         const dInput = document.getElementById(`discount-site-${letter}`);
@@ -192,6 +203,7 @@ async function loadSettings() {
       const modalUrlE = document.getElementById('modal-url-site-e');
       const modalUrlH = document.getElementById('modal-url-site-h');
       const modalUrlI = document.getElementById('modal-url-site-i');
+      const modalUrlJ = document.getElementById('modal-url-site-j');
       if (modalUrlA) modalUrlA.value = items.url_site_a;
       if (modalUrlB) modalUrlB.value = items.url_site_b;
       if (modalUrlC) modalUrlC.value = items.url_site_c;
@@ -199,6 +211,7 @@ async function loadSettings() {
       if (modalUrlE) modalUrlE.value = items.url_site_e;
       if (modalUrlH) modalUrlH.value = items.url_site_h;
       if (modalUrlI) modalUrlI.value = items.url_site_i;
+      if (modalUrlJ) modalUrlJ.value = items.url_site_j;
 
       // Giriş Bilgilerini Doldur
       const cUserA = document.getElementById('cred-user-site-a');
@@ -215,6 +228,9 @@ async function loadSettings() {
       const cCompI = document.getElementById('cred-company-site-i');
       const cUserI = document.getElementById('cred-user-site-i');
       const cPassI = document.getElementById('cred-pass-site-i');
+      const cCompJ = document.getElementById('cred-company-site-j');
+      const cUserJ = document.getElementById('cred-user-site-j');
+      const cPassJ = document.getElementById('cred-pass-site-j');
 
       if (cUserA) cUserA.value = items.cred_user_site_a || "info@aygunleryapi.com";
       if (cPassA) cPassA.value = items.cred_pass_site_a || "FZ0DT1YL*0OE";
@@ -230,6 +246,9 @@ async function loadSettings() {
       if (cCompI) cCompI.value = items.cred_company_site_i || "M01A02";
       if (cUserI) cUserI.value = items.cred_user_site_i || "1";
       if (cPassI) cPassI.value = items.cred_pass_site_i || "AYGUNLER01";
+      if (cCompJ) cCompJ.value = items.cred_company_site_j || "MA301";
+      if (cUserJ) cUserJ.value = items.cred_user_site_j || "AYGUNLER";
+      if (cPassJ) cPassJ.value = items.cred_pass_site_j || "MA301";
 
       renderKeywordDiscountRules();
       renderRangeDiscountRules();
@@ -1114,6 +1133,9 @@ function setupUIEventListeners() {
       const compI = document.getElementById('cred-company-site-i').value.trim();
       const userI = document.getElementById('cred-user-site-i').value.trim();
       const passI = document.getElementById('cred-pass-site-i').value.trim();
+      const compJ = document.getElementById('cred-company-site-j') ? document.getElementById('cred-company-site-j').value.trim() : "MA301";
+      const userJ = document.getElementById('cred-user-site-j') ? document.getElementById('cred-user-site-j').value.trim() : "AYGUNLER";
+      const passJ = document.getElementById('cred-pass-site-j') ? document.getElementById('cred-pass-site-j').value.trim() : "MA301";
 
       chrome.storage.sync.set({
         cred_user_site_a: userA,
@@ -1129,7 +1151,10 @@ function setupUIEventListeners() {
         cred_pass_site_h: passH,
         cred_company_site_i: compI,
         cred_user_site_i: userI,
-        cred_pass_site_i: passI
+        cred_pass_site_i: passI,
+        cred_company_site_j: compJ,
+        cred_user_site_j: userJ,
+        cred_pass_site_j: passJ
       }, () => {
         alert("B2B giriş bilgileri başarıyla kaydedildi!");
       });

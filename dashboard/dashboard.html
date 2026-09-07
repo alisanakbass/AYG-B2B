@@ -389,6 +389,37 @@
                 >
               </div>
             </div>
+            <div class="site-item" data-site="SITE_J">
+              <label class="site-checkbox-label">
+                <input type="checkbox" id="site-j-check" checked />
+                <span class="site-name" style="color: #0891b2"
+                  >Düz Metal</span
+                >
+              </label>
+              <div class="site-status-row">
+                <button
+                  class="connect-btn"
+                  data-site="SITE_J"
+                  title="Bağlan / Giriş Yap"
+                >
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                  >
+                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                    <line x1="12" y1="2" x2="12" y2="12"></line>
+                  </svg>
+                  <span>Bağlan</span>
+                </button>
+                <span class="status-indicator loading" id="site-j-status"
+                  >Kontrol Ediliyor...</span
+                >
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1451,6 +1482,52 @@
                             />
                           </td>
                         </tr>
+                        <tr style="border-bottom: 1px solid var(--border)">
+                          <td
+                            style="
+                              padding: 10px;
+                              font-weight: 500;
+                              color: #0891b2;
+                            "
+                          >
+                            Düz Metal
+                          </td>
+                          <td style="padding: 10px; text-align: center">
+                            <input
+                              type="number"
+                              id="margin-site-j"
+                              style="
+                                width: 80px;
+                                padding: 6px;
+                                text-align: center;
+                                background: var(--bg-input);
+                                border: 1px solid var(--border);
+                                border-radius: 6px;
+                                color: var(--text);
+                              "
+                              min="0"
+                              value="40"
+                            />
+                          </td>
+                          <td style="padding: 10px; text-align: center">
+                            <input
+                              type="number"
+                              id="discount-site-j"
+                              style="
+                                width: 80px;
+                                padding: 6px;
+                                text-align: center;
+                                background: var(--bg-input);
+                                border: 1px solid var(--border);
+                                border-radius: 6px;
+                                color: var(--text);
+                              "
+                              min="0"
+                              max="100"
+                              value="0"
+                            />
+                          </td>
+                        </tr>
                       </tbody>
                     </table>
                   </div>
@@ -1882,6 +1959,10 @@
                 <label for="modal-url-site-i">Tok Ticaret Arama URL</label>
                 <input type="text" id="modal-url-site-i" value="" />
               </div>
+              <div class="input-wrapper">
+                <label for="modal-url-site-j">Düz Metal Arama URL</label>
+                <input type="text" id="modal-url-site-j" value="" />
+              </div>
               <div class="cart-action-buttons" style="margin-top: 15px">
                 <button id="modal-save-urls-btn" class="primary-btn flex-btn">
                   Kaydet
@@ -2146,6 +2227,54 @@
                     type="password"
                     id="cred-pass-site-i"
                     placeholder="Parolanız..."
+                  />
+                </div>
+              </div>
+
+              <div
+                class="settings-group-title"
+                style="
+                  font-size: 12px;
+                  font-weight: 600;
+                  text-transform: uppercase;
+                  color: var(--text-muted);
+                  margin-bottom: 10px;
+                  margin-top: 15px;
+                "
+              >
+                Düz Metal
+              </div>
+              <div
+                class="settings-group"
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 8px;
+                  margin-bottom: 15px;
+                "
+              >
+                <div class="input-wrapper">
+                  <label for="cred-company-site-j">Bayi Kodu</label>
+                  <input
+                    type="text"
+                    id="cred-company-site-j"
+                    placeholder="Bayi kodunuz (örn. MA301)..."
+                  />
+                </div>
+                <div class="input-wrapper">
+                  <label for="cred-user-site-j">Kullanıcı Adı</label>
+                  <input
+                    type="text"
+                    id="cred-user-site-j"
+                    placeholder="Kullanıcı adınız (örn. AYGUNLER)..."
+                  />
+                </div>
+                <div class="input-wrapper">
+                  <label for="cred-pass-site-j">Şifre</label>
+                  <input
+                    type="password"
+                    id="cred-pass-site-j"
+                    placeholder="Şifreniz..."
                   />
                 </div>
               </div>

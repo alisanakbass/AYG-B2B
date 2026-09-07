@@ -94,6 +94,12 @@ export const PARSERS = {
       return { key, name, basePrice, domain, imgUrl, unit, packQuantity: packQuantity || 1 };
     }
   },
+  SITE_J: {
+    name: "Düz Metal",
+    badgeClass: "site_j",
+    rowSelector: null,
+    parseRow: null
+  },
   SITE_E: {
     name: "Akyüzler",
     badgeClass: "site_e",
@@ -332,7 +338,7 @@ export async function checkAllSessions() {
   try {
     if (typeof chrome !== 'undefined' && chrome?.storage?.local) {
       storageData = await new Promise(r =>
-        chrome.storage.local.get(['enderyapi_token', 'akyuz_token', 'session_SITE_A', 'session_SITE_C', 'session_SITE_D', 'session_SITE_E', 'session_SITE_H', 'session_SITE_I'], r)
+        chrome.storage.local.get(['enderyapi_token', 'akyuz_token', 'duzmetal_token', 'session_SITE_A', 'session_SITE_C', 'session_SITE_D', 'session_SITE_E', 'session_SITE_H', 'session_SITE_I', 'session_SITE_J'], r)
       ) || {};
     }
   } catch (err) {
@@ -373,6 +379,12 @@ export async function checkAllSessions() {
   updateStatusIndicator('SITE_I',
     storageData.session_SITE_I ? 'success' : 'idle',
     storageData.session_SITE_I ? 'Aktif' : 'Pasif'
+  );
+
+  const isDuzmetalActive = !!(storageData.duzmetal_token || storageData.session_SITE_J);
+  updateStatusIndicator('SITE_J',
+    isDuzmetalActive ? 'success' : 'idle',
+    isDuzmetalActive ? 'Aktif' : 'Pasif'
   );
 }
 
@@ -473,6 +485,9 @@ export async function executeSearch() {
 
   if (document.getElementById('site-i-check') && document.getElementById('site-i-check').checked) activeSites.push('SITE_I');
   else updateStatusIndicator('SITE_I', 'idle', 'Devre Dışı');
+
+  if (document.getElementById('site-j-check') && document.getElementById('site-j-check').checked) activeSites.push('SITE_J');
+  else updateStatusIndicator('SITE_J', 'idle', 'Devre Dışı');
 
   if (activeSites.length === 0) {
     resultsContainer.innerHTML = `
@@ -1187,6 +1202,185 @@ export async function fetchFromB2B(siteKey, query) {
       updateStatusIndicator(siteKey, 'error', 'Hata Oluştu');
       return;
     }
+  }
+
+  // --- DÜZ METAL (SITE_J) API SORGU YÖNTEMİ ---
+  if (siteKey === 'SITE_J') {
+    const config = PARSERS[siteKey];
+    let storageData = await new Promise(r => chrome.storage.local.get('duzmetal_token', r));
+    let token = storageData.duzmetal_token;
+
+    async function loginDuzMetal() {
+      const syncData = await new Promise(r => chrome.storage.sync.get(['cred_company_site_j', 'cred_user_site_j', 'cred_pass_site_j'], r));
+      const payload = {
+        bayiKod: (syncData.cred_company_site_j || 'MA301').trim(),
+        kullaniciAdi: (syncData.cred_user_site_j || 'AYGUNLER').trim(),
+        sifre: (syncData.cred_pass_site_j || 'MA301').trim()
+      };
+      const res = await fetch('https://api.duzmetal.com/auth/giris', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data && data.status && data.data && data.data.Token) {
+        await new Promise(r => chrome.storage.local.set({ duzmetal_token: data.data.Token, session_SITE_J: true }, r));
+        return data.data.Token;
+      }
+      throw new Error(data.messages || 'Düz Metal giriş başarısız');
+    }
+
+    if (!token) {
+      try {
+        token = await loginDuzMetal();
+      } catch (err) {
+        console.error('[B2B Portal] Düz Metal token alınamadı:', err);
+        updateStatusIndicator(siteKey, 'error', 'Giriş Başarısız');
+        return;
+      }
+    }
+
+    const apiUrl = 'https://api.duzmetal.com/urun';
+    const postBody = {
+      kelime: query,
+      sayfa: 1,
+      isSayfa: false
+    };
+
+    try {
+      let response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(postBody)
+      });
+
+      if (response.status === 401) {
+        // Token süresi dolmuş olabilir, tekrar giriş yapıp dene
+        token = await loginDuzMetal();
+        response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(postBody)
+        });
+      }
+
+      if (response.status === 404) {
+        updateStatusIndicator(siteKey, 'idle', '0 Ürün');
+        return;
+      }
+
+      if (!response.ok) throw new Error(`HTTP Hata: ${response.status}`);
+
+      const data = await response.json();
+      if (!data || !data.data) {
+        updateStatusIndicator(siteKey, 'idle', '0 Ürün');
+        return;
+      }
+
+      const list = data.data.veri || data.data.list || (Array.isArray(data.data) ? data.data : []);
+      let itemsFoundCount = 0;
+
+      list.forEach(item => {
+        try {
+          let name = 'Bilinmeyen Ürün';
+          if (typeof item.o_baslik === 'string') {
+            try {
+              const bObj = JSON.parse(item.o_baslik);
+              name = bObj.baslik || (bObj.dil_ceviri && bObj.dil_ceviri.tr) || item.o_baslik;
+            } catch {
+              name = item.o_baslik;
+            }
+          } else if (item.o_baslik && typeof item.o_baslik === 'object') {
+            name = item.o_baslik.baslik || name;
+          }
+
+          const code = item.o_kod || '';
+          const id = item.o_id || '';
+
+          let rawPrice = 0;
+          let currency = 'TRY';
+          if (item.o_fiyat) {
+            let fObj = item.o_fiyat;
+            if (typeof fObj === 'string') {
+              try { fObj = JSON.parse(fObj); } catch { fObj = {}; }
+            }
+            rawPrice = fObj.o_fiyat_birim_kdvsiz || fObj.o_fiyat_birim_yerel || fObj.o_fiyat_birim || 0;
+            const curStr = fObj.o_fiyat_birim_kdvsiz_doviz || fObj.o_fiyat_birim_doviz || '';
+            if (curStr.includes('$') || curStr.toUpperCase().includes('USD')) currency = 'USD';
+            else if (curStr.includes('€') || curStr.toUpperCase().includes('EUR')) currency = 'EUR';
+          }
+
+          let basePrice = typeof rawPrice === 'number' ? rawPrice : parsePrice(rawPrice.toString());
+          if (currency === 'USD') {
+            basePrice = basePrice * state.exchangeRates.USD;
+          } else if (currency === 'EUR') {
+            basePrice = basePrice * state.exchangeRates.EUR;
+          }
+
+          let imgUrl = '';
+          if (item.o_resim_list) {
+            let rList = item.o_resim_list;
+            if (typeof rList === 'string') {
+              try { rList = JSON.parse(rList); } catch { rList = []; }
+            }
+            if (Array.isArray(rList) && rList.length > 0) {
+              imgUrl = rList[0].url || '';
+            }
+          }
+
+          let unit = 'ADET';
+          if (item.o_birim) {
+            let birimObj = item.o_birim;
+            if (typeof birimObj === 'string') {
+              try { birimObj = JSON.parse(birimObj); } catch { birimObj = {}; }
+            }
+            if (birimObj.baslik) unit = birimObj.baslik.toUpperCase();
+          }
+
+          let packQuantity = item.o_koli_ici || parsePackQuantityFromName(name) || 1;
+
+          const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
+          const key = `b2b_duzmetal_${id || code || cleanName}`;
+
+          if (!isNaN(basePrice) && basePrice > 0) {
+            state.currentResults.push({
+              key,
+              name,
+              basePrice,
+              domain,
+              imgUrl,
+              sourceKey: siteKey,
+              sourceName: config.name,
+              badgeClass: config.badgeClass,
+              unit,
+              packQuantity
+            });
+            itemsFoundCount++;
+          }
+        } catch (itemErr) {
+          console.error('[Düz Metal] Ürün satırı çözme hatası:', itemErr);
+        }
+      });
+
+      updateStatusIndicator(siteKey, 'success', `${itemsFoundCount} Ürün`);
+      if (itemsFoundCount > 0) updateSessionActive(siteKey);
+    } catch (error) {
+      console.error(`[B2B Portal] Düz Metal arama hatası:`, error);
+      if (error.message && error.message.includes('401')) {
+        updateStatusIndicator(siteKey, 'error', 'Pasif');
+      } else {
+        updateStatusIndicator(siteKey, 'error', 'Hata Oluştu');
+      }
+    }
+    return;
   }
 
 

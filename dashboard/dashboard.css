@@ -824,6 +824,7 @@ button {
 .filter-btn .site-dot.site_e { background: #10b981; }
 .filter-btn .site-dot.site_h { background: #818cf8; }
 .filter-btn .site-dot.site_i { background: #f97316; }
+.filter-btn .site-dot.site_j { background: #06b6d4; }
 
 .filter-btn .filter-count {
   font-size: 10px;
@@ -984,6 +985,11 @@ button {
 .source-badge.site_i {
   background: rgba(14, 138, 58, 0.14);
   color: #0e8a3a;
+}
+
+.source-badge.site_j {
+  background: rgba(6, 182, 212, 0.14);
+  color: #0891b2;
 }
 
 .product-name-cell {

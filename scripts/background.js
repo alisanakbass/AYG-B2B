@@ -7,7 +7,8 @@ const DEFAULT_URLS = {
   SITE_D: "https://yenibayi.polisankansai.com/order/makeordernew?search={query}",
   SITE_E: "https://bayi.akyuztools.com/Search/SearchProduct",
   SITE_H: "https://b2b.kamilturk.com/Arama/_Prbx?q={query}",
-  SITE_I: "https://bayi.tokticaret.com.tr/SiparisGir.asp?sayfa=&FAdi={query}&F=Ara&Sirala=varsayilan"
+  SITE_I: "https://bayi.tokticaret.com.tr/SiparisGir.asp?sayfa=&FAdi={query}&F=Ara&Sirala=varsayilan",
+  SITE_J: "https://b2b.duzmetal.com/urun/arama?kelime={query}"
 };
 
 // Eklenti yüklendiğinde veya güncellendiğinde alarmı kur ve kuralları ayarla
@@ -53,13 +54,28 @@ async function setupDeclarativeRules() {
         urlFilter: "||b2b.kamilturk.com/*",
         resourceTypes: ["xmlhttprequest"]
       }
+    },
+    {
+      id: 3,
+      priority: 1,
+      action: {
+        type: "modifyHeaders",
+        requestHeaders: [
+          { header: "origin", operation: "set", value: "https://b2b.duzmetal.com" },
+          { header: "referer", operation: "set", value: "https://b2b.duzmetal.com/" }
+        ]
+      },
+      condition: {
+        urlFilter: "||api.duzmetal.com/*",
+        resourceTypes: ["xmlhttprequest"]
+      }
     }
   ];
 
   try {
     // Eski kuralları temizle ve yenilerini ekle
     await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [1, 2],
+      removeRuleIds: [1, 2, 3],
       addRules: rules
     });
     console.log("[B2B Background] Declarative Net Request kuralları başarıyla tanımlandı.");
@@ -135,6 +151,33 @@ async function keepTokTicaretAlive() {
     }
   } catch (error) {
     console.error("[B2B KeepAlive] Tok Ticaret ping hatası:", error);
+  }
+
+  // Düz Metal Kontrolü
+  try {
+    const storageData = await new Promise(r => chrome.storage.local.get('duzmetal_token', r));
+    if (!storageData.duzmetal_token) {
+      console.log("[B2B KeepAlive] Düz Metal oturumu kapalı, otomatik giriş yapılıyor...");
+      await performLoginForSite('SITE_J');
+    } else {
+      const pingRes = await fetch("https://api.duzmetal.com/urun", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${storageData.duzmetal_token}`
+        },
+        body: JSON.stringify({ kelime: "test" })
+      });
+      if (pingRes.status === 401) {
+        console.log("[B2B KeepAlive] Düz Metal token süresi dolmuş, yenileniyor...");
+        await performLoginForSite('SITE_J');
+      } else {
+        console.log("[B2B KeepAlive] Düz Metal oturumu aktif.");
+        await updateStorageSession('SITE_J', true);
+      }
+    }
+  } catch (error) {
+    console.error("[B2B KeepAlive] Düz Metal ping hatası:", error);
   }
 }
 
@@ -241,6 +284,9 @@ async function performBackgroundLoginForAll() {
   if (storage['site-i-check']) {
     results.SITE_I = await performLoginForSite('SITE_I');
   }
+  if (storage['site-j-check']) {
+    results.SITE_J = await performLoginForSite('SITE_J');
+  }
   return results;
 }
 
@@ -327,6 +373,50 @@ async function performLoginForSite(siteKey, isManual = false) {
       console.error("[B2B Background] Tok Ticaret sessiz giriş hatası:", err);
     }
     console.log("[B2B Background] Tok Ticaret sessiz giriş başarısız oldu, sekmeli yönteme geçiliyor.");
+  }
+
+  if (siteKey === 'SITE_J') {
+    const creds = await new Promise(r => chrome.storage.sync.get({
+      cred_company_site_j: "MA301",
+      cred_user_site_j: "AYGUNLER",
+      cred_pass_site_j: "MA301"
+    }, r));
+
+    const companyCode = creds.cred_company_site_j || "MA301";
+    const username = creds.cred_user_site_j || "AYGUNLER";
+    const password = creds.cred_pass_site_j || "MA301";
+
+    try {
+      console.log(`[B2B Background] Düz Metal sessiz giriş isteği yapılıyor... Bayi: ${companyCode}, Kullanıcı: ${username}`);
+      const loginRes = await fetch("https://api.duzmetal.com/auth/giris", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          bayiKod: companyCode.trim(),
+          kullaniciAdi: username.trim(),
+          sifre: password.trim()
+        })
+      });
+
+      if (loginRes.ok) {
+        const data = await loginRes.json();
+        if (data && data.status && data.data && data.data.Token) {
+          console.log("[B2B Background] Düz Metal sessiz giriş başarılı.");
+          await new Promise(r => chrome.storage.local.set({
+            duzmetal_token: data.data.Token,
+            session_SITE_J: true
+          }, r));
+          return { success: true, message: "Oturum Başarıyla Açıldı" };
+        }
+      } else {
+        console.warn(`[B2B Background] Düz Metal sessiz giriş HTTP hatası: ${loginRes.status}`);
+      }
+    } catch (err) {
+      console.error("[B2B Background] Düz Metal sessiz giriş hatası:", err);
+    }
+    return { success: false, message: "Düz Metal Giriş Başarısız" };
   }
 
   if (siteKey === 'SITE_E') {

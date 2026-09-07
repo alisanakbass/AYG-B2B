@@ -7,43 +7,6 @@ let imageFetchQueue = [];
 
 // --- DYNAMIC SELECTORS ---
 export const PARSERS = {
-  SITE_G: {
-    name: "Nalburdayım",
-    badgeClass: "site_g",
-    rowSelector: '.art[role="listitem"], .art.list-border',
-    parseRow: (row, domain) => {
-      const nameEl = row.querySelector('.art-name a') || row.querySelector('.art-name') || row.querySelector('.art-title a');
-      if (!nameEl) return null;
-      const name = (nameEl.getAttribute('title') || nameEl.textContent || '').trim();
-      if (!name) return null;
-
-      const priceEl = row.querySelector('.art-finalprice .art-price-value') || row.querySelector('.art-price-value') || row.querySelector('.art-price');
-      if (!priceEl) return null;
-
-      const rawPrice = parsePrice(priceEl.textContent);
-      if (isNaN(rawPrice) || rawPrice <= 0) return null;
-
-      const basePrice = rawPrice / 1.20; // KDV (%20) hariç taban fiyatı hesaplayalım.
-
-      const linkEl = row.querySelector('.art-name a') || row.querySelector('a');
-      const href = linkEl ? linkEl.getAttribute('href') : '';
-      const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
-      const key = `b2b_${domain.replace(/\./g, '_')}_${cleanName}`;
-
-      let imgUrl = '';
-      const imgEl = row.querySelector('.art-picture-block img') || row.querySelector('.art-picture img') || row.querySelector('img');
-      if (imgEl) {
-        imgUrl = imgEl.getAttribute('data-src') || imgEl.getAttribute('src') || '';
-      }
-      if (imgUrl.startsWith('//')) {
-        imgUrl = 'https:' + imgUrl;
-      } else if (imgUrl.startsWith('/') && !imgUrl.startsWith('//')) {
-        imgUrl = 'https://www.nalburdayim.com' + imgUrl;
-      }
-
-      return { key, name, basePrice, domain, imgUrl, unit: 'ADET', packQuantity: 1 };
-    }
-  },
   SITE_F: {
     name: "Fırat Boru",
     badgeClass: "site_f",
@@ -80,6 +43,55 @@ export const PARSERS = {
       }
 
       return { key, name, basePrice, domain, imgUrl, unit: 'ADET', packQuantity: 1 };
+    }
+  },
+  SITE_I: {
+    name: "Tok Ticaret",
+    badgeClass: "site_i",
+    rowSelector: 'tr[id]',
+    parseRow: (row, domain) => {
+      const tds = row.querySelectorAll('td');
+      if (tds.length < 7) return null;
+
+      const code = tds[1]?.textContent?.trim() || '';
+      const name = tds[2]?.textContent?.trim() || 'Bilinmeyen Ürün';
+      if (!name || name === 'Bilinmeyen Ürün') return null;
+
+      // İnd. Fiyat/Ad. sütunu (tds[6]) net alış fiyatıdır
+      const priceText = tds[6]?.textContent || '';
+      let basePrice = parsePrice(priceText);
+      if (isNaN(basePrice) || basePrice <= 0) return null;
+
+      let currency = 'TRY';
+      if (priceText.includes('$') || priceText.includes('USD') || priceText.includes('USDB')) {
+        currency = 'USD';
+      } else if (priceText.includes('€') || priceText.includes('EUR') || priceText.includes('EURO') || priceText.includes('EUROB')) {
+        currency = 'EUR';
+      }
+
+      if (currency === 'USD') {
+        basePrice = basePrice * state.exchangeRates.USD;
+      } else if (currency === 'EUR') {
+        basePrice = basePrice * state.exchangeRates.EUR;
+      }
+
+      const codeId = row.id || code.replace(/[^\w]/g, '_') || '';
+      const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
+      const key = `b2b_${domain.replace(/\./g, '_')}_${codeId || cleanName}`;
+
+      let imgUrl = '';
+      const imgEl = row.querySelector('td a.lightbox-item img, td img.urun-kucuk-resim, img');
+      if (imgEl) {
+        imgUrl = imgEl.getAttribute('data-src') || imgEl.getAttribute('src') || '';
+      }
+
+      const unitEl = row.querySelector('#basic-addon1') || tds[9]?.querySelector('.input-group-text');
+      let unit = unitEl ? unitEl.textContent.trim().toUpperCase() : 'ADET';
+      if (!unit) unit = 'ADET';
+
+      let packQuantity = parsePackQuantityFromName(name);
+
+      return { key, name, basePrice, domain, imgUrl, unit, packQuantity: packQuantity || 1 };
     }
   },
   SITE_E: {
@@ -320,7 +332,7 @@ export async function checkAllSessions() {
   try {
     if (typeof chrome !== 'undefined' && chrome?.storage?.local) {
       storageData = await new Promise(r =>
-        chrome.storage.local.get(['enderyapi_token', 'akyuz_token', 'session_SITE_A', 'session_SITE_C', 'session_SITE_D', 'session_SITE_E', 'session_SITE_H'], r)
+        chrome.storage.local.get(['enderyapi_token', 'akyuz_token', 'session_SITE_A', 'session_SITE_C', 'session_SITE_D', 'session_SITE_E', 'session_SITE_H', 'session_SITE_I'], r)
       ) || {};
     }
   } catch (err) {
@@ -353,11 +365,14 @@ export async function checkAllSessions() {
     isAkyuzActive ? 'Aktif' : 'Pasif'
   );
 
-  updateStatusIndicator('SITE_G', 'success', 'Aktif');
-
   updateStatusIndicator('SITE_H',
     storageData.session_SITE_H ? 'success' : 'idle',
     storageData.session_SITE_H ? 'Aktif' : 'Pasif'
+  );
+
+  updateStatusIndicator('SITE_I',
+    storageData.session_SITE_I ? 'success' : 'idle',
+    storageData.session_SITE_I ? 'Aktif' : 'Pasif'
   );
 }
 
@@ -453,11 +468,11 @@ export async function executeSearch() {
   if (document.getElementById('site-f-check').checked) activeSites.push('SITE_F');
   else updateStatusIndicator('SITE_F', 'idle', 'Devre Dışı');
 
-  if (document.getElementById('site-g-check').checked) activeSites.push('SITE_G');
-  else updateStatusIndicator('SITE_G', 'idle', 'Devre Dışı');
-
   if (document.getElementById('site-h-check').checked) activeSites.push('SITE_H');
   else updateStatusIndicator('SITE_H', 'idle', 'Devre Dışı');
+
+  if (document.getElementById('site-i-check') && document.getElementById('site-i-check').checked) activeSites.push('SITE_I');
+  else updateStatusIndicator('SITE_I', 'idle', 'Devre Dışı');
 
   if (activeSites.length === 0) {
     resultsContainer.innerHTML = `
@@ -498,10 +513,6 @@ export async function fetchFromB2B(siteKey, query) {
   const urlTemplate = settings[storageKey] || DEFAULT_URLS[storageKey];
 
   let encodedQuery = encodeURIComponent(query);
-  if (siteKey === 'SITE_G') {
-    // Nalburdayım boşlukların '+' olarak kodlanmasını bekler
-    encodedQuery = encodedQuery.replace(/%20/g, '+');
-  }
 
   const searchUrl = urlTemplate.replace('{query}', encodedQuery);
   const domain = new URL(searchUrl).hostname;

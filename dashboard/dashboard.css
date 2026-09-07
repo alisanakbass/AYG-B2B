@@ -822,8 +822,8 @@ button {
 .filter-btn .site-dot.site_c { background: #fbbf24; }
 .filter-btn .site-dot.site_d { background: #f472b6; }
 .filter-btn .site-dot.site_e { background: #10b981; }
-.filter-btn .site-dot.site_g { background: #fb923c; }
 .filter-btn .site-dot.site_h { background: #818cf8; }
+.filter-btn .site-dot.site_i { background: #f97316; }
 
 .filter-btn .filter-count {
   font-size: 10px;
@@ -976,14 +976,14 @@ button {
   color: #f87171;
 }
 
-.source-badge.site_g {
-  background: rgba(251, 146, 60, 0.12);
-  color: #fb923c;
-}
-
 .source-badge.site_h {
   background: rgba(99, 102, 241, 0.12);
   color: #818cf8;
+}
+
+.source-badge.site_i {
+  background: rgba(14, 138, 58, 0.14);
+  color: #0e8a3a;
 }
 
 .product-name-cell {
@@ -1080,6 +1080,7 @@ button {
   margin: 0;
 }
 .qty-input-table {
+  appearance: textfield;
   -moz-appearance: textfield;
 }
 

@@ -119,6 +119,7 @@ export function getSourceKeyFromDomain(domain) {
   if (domain.includes('akyuztools') || domain.includes('akyuz')) return 'SITE_E';
   if (domain.includes('firat') || domain.includes('excel')) return 'SITE_F';
   if (domain.includes('kamilturk')) return 'SITE_H';
+  if (domain.includes('tokticaret')) return 'SITE_I';
   return '';
 }
 

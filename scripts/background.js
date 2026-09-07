@@ -6,8 +6,8 @@ const DEFAULT_URLS = {
   SITE_C: "https://bayi.yasarteknik.com.tr/YeniSiparisGir.asp?F=Ara&FAdi={query}",
   SITE_D: "https://yenibayi.polisankansai.com/order/makeordernew?search={query}",
   SITE_E: "https://bayi.akyuztools.com/Search/SearchProduct",
-  SITE_G: "https://www.nalburdayim.com/search/?q={query}",
-  SITE_H: "https://b2b.kamilturk.com/Arama/_Prbx?q={query}"
+  SITE_H: "https://b2b.kamilturk.com/Arama/_Prbx?q={query}",
+  SITE_I: "https://bayi.tokticaret.com.tr/SiparisGir.asp?sayfa=&FAdi={query}&F=Ara&Sirala=varsayilan"
 };
 
 // Eklenti yüklendiğinde veya güncellendiğinde alarmı kur ve kuralları ayarla
@@ -76,11 +76,12 @@ async function isDashboardOpen() {
 
 // Zamanlayıcı tetiklendiğinde
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  // Bu alarm artık sadece Yaşar Teknik oturumunu canlı tutmak için kullanılıyor.
+  // Bu alarm Yaşar Teknik ve Tok Ticaret oturumlarını canlı tutmak için kullanılıyor.
   if (alarm.name === "b2b_keepalive") {
     const open = await isDashboardOpen();
     if (open) {
       await keepYasarTeknikAlive();
+      await keepTokTicaretAlive();
     }
   }
 });
@@ -109,6 +110,31 @@ async function keepYasarTeknikAlive() {
     }
   } catch (error) {
     console.error("[B2B KeepAlive] Yaşar Teknik ping hatası:", error);
+  }
+}
+
+// Tok Ticaret oturumunu sessizce canlı tutan fonksiyon
+async function keepTokTicaretAlive() {
+  try {
+    const response = await fetch("https://bayi.tokticaret.com.tr/Default.asp", {
+      method: "GET",
+      credentials: "include"
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP Hata: ${response.status}`);
+    }
+    const htmlText = await response.text();
+    const isLoginPage = htmlText.includes('frmLogin') || htmlText.includes('Login.asp') || htmlText.includes('KullaniciAdi');
+
+    if (isLoginPage) {
+      console.log("[B2B KeepAlive] Tok Ticaret oturumu kapalı, otomatik giriş yapılıyor...");
+      await performLoginForSite('SITE_I');
+    } else {
+      console.log("[B2B KeepAlive] Tok Ticaret oturumu aktif, ping başarılı.");
+      await updateStorageSession('SITE_I', true);
+    }
+  } catch (error) {
+    console.error("[B2B KeepAlive] Tok Ticaret ping hatası:", error);
   }
 }
 
@@ -189,8 +215,8 @@ async function performBackgroundLoginForAll() {
     'site-c-check': true,
     'site-d-check': true,
     'site-e-check': true,
-    'site-g-check': false,
-    'site-h-check': true
+    'site-h-check': true,
+    'site-i-check': true
   }, r));
 
   const results = {};
@@ -209,30 +235,17 @@ async function performBackgroundLoginForAll() {
   if (storage['site-e-check']) {
     results.SITE_E = await performLoginForSite('SITE_E');
   }
-  if (storage['site-g-check']) {
-    results.SITE_G = await performLoginForSite('SITE_G');
-  }
   if (storage['site-h-check']) {
     results.SITE_H = await performLoginForSite('SITE_H');
+  }
+  if (storage['site-i-check']) {
+    results.SITE_I = await performLoginForSite('SITE_I');
   }
   return results;
 }
 
 // Belirli bir site için giriş işlemini gerçekleştir
 async function performLoginForSite(siteKey, isManual = false) {
-  if (siteKey === 'SITE_G') {
-    if (isManual) {
-      const loginUrl = "https://www.nalburdayim.com/login/";
-      try {
-        await chrome.tabs.create({ url: loginUrl, active: true });
-        return { success: true, message: "Giriş Sayfası Açıldı" };
-      } catch (e) {
-        return { success: false, message: e.message };
-      }
-    }
-    await updateStorageSession('SITE_G', true);
-    return { success: true, message: "Aktif" };
-  }
 
   if (siteKey === 'SITE_C') {
     // Yaşar Teknik için sekme açmak yerine önce sessizce arka planda AJAX POST giriş deniyoruz.
@@ -275,6 +288,47 @@ async function performLoginForSite(siteKey, isManual = false) {
     console.log("[B2B Background] Yaşar Teknik sessiz giriş başarısız oldu, sekmeli yönteme geçiliyor.");
   }
 
+  if (siteKey === 'SITE_I') {
+    // Tok Ticaret için sekme açmak yerine önce sessizce arka planda AJAX POST giriş deniyoruz.
+    const creds = await new Promise(r => chrome.storage.sync.get({
+      cred_company_site_i: "M01A02",
+      cred_user_site_i: "1",
+      cred_pass_site_i: "AYGUNLER01"
+    }, r));
+
+    const companyCode = creds.cred_company_site_i || "M01A02";
+    const username = creds.cred_user_site_i || "1";
+    const password = creds.cred_pass_site_i || "AYGUNLER01";
+
+    try {
+      console.log(`[B2B Background] Tok Ticaret sessiz giriş isteği yapılıyor... Müşteri: ${companyCode}, Kullanıcı: ${username}`);
+      const loginRes = await fetch("https://bayi.tokticaret.com.tr/ajax/Login.asp", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: `KullaniciAdi=${encodeURIComponent(companyCode)}&KullaniciKodu=${encodeURIComponent(username)}&Sifre=${encodeURIComponent(password)}`
+      });
+
+      if (loginRes.ok) {
+        const text = await loginRes.text();
+        const trimmedText = text.trim();
+        console.log(`[B2B Background] Tok Ticaret sessiz giriş yanıtı: "${trimmedText}"`);
+        if (trimmedText === "1" || trimmedText === "0") {
+          console.log("[B2B Background] Tok Ticaret sessiz giriş başarılı.");
+          await updateStorageSession('SITE_I', true);
+          return { success: true, message: "Oturum Sessizce Açıldı" };
+        }
+      } else {
+        console.warn(`[B2B Background] Tok Ticaret sessiz giriş HTTP hatası: ${loginRes.status} ${loginRes.statusText}`);
+      }
+    } catch (err) {
+      console.error("[B2B Background] Tok Ticaret sessiz giriş hatası:", err);
+    }
+    console.log("[B2B Background] Tok Ticaret sessiz giriş başarısız oldu, sekmeli yönteme geçiliyor.");
+  }
+
   if (siteKey === 'SITE_E') {
     // Akyüzler için eğer manuel tıklama yapıldıysa giriş sayfasını yeni sekmede açıyoruz.
     // Arka plan otomatik tetiklemelerinde ise sadece token kontrolü yapıyoruz.
@@ -299,6 +353,8 @@ async function performLoginForSite(siteKey, isManual = false) {
   let loginUrl = "";
   if (siteKey === 'SITE_H') {
     loginUrl = "https://b2b.kamilturk.com/Login/Login";
+  } else if (siteKey === 'SITE_I') {
+    loginUrl = "https://bayi.tokticaret.com.tr/Login.asp";
   } else {
     try {
       // Özelleştirilmiş URL şablonunu al
@@ -310,9 +366,11 @@ async function performLoginForSite(siteKey, isManual = false) {
       // Hata durumunda varsayılan domain köküne yönel
       const def = DEFAULT_URLS[siteKey];
       if (def) {
-        loginUrl = def.split('/search')[0].split('/tr/')[0].split('/YeniSiparis')[0].split('/Arama')[0];
+        loginUrl = def.split('/search')[0].split('/tr/')[0].split('/YeniSiparis')[0].split('/Arama')[0].split('/SiparisGir')[0];
+      } else if (siteKey === 'SITE_I') {
+        loginUrl = "https://bayi.tokticaret.com.tr/Login.asp";
       } else {
-        loginUrl = "https://b2b.kamilturk.com";
+        loginUrl = "https://bayi.tokticaret.com.tr/Login.asp";
       }
     }
   }
@@ -329,7 +387,10 @@ async function performLoginForSite(siteKey, isManual = false) {
     cred_user_site_d: "17183",
     cred_pass_site_d: "27f4e5d",
     cred_user_site_h: "1340631",
-    cred_pass_site_h: "662732"
+    cred_pass_site_h: "662732",
+    cred_company_site_i: "M01A02",
+    cred_user_site_i: "1",
+    cred_pass_site_i: "AYGUNLER01"
   }, r));
 
   // Eğer sync storage'da boş string olarak kayıtlıysa varsayılan değerleri atayalım
@@ -344,6 +405,9 @@ async function performLoginForSite(siteKey, isManual = false) {
   if (!creds.cred_pass_site_d) creds.cred_pass_site_d = "27f4e5d";
   if (!creds.cred_user_site_h) creds.cred_user_site_h = "1340631";
   if (!creds.cred_pass_site_h) creds.cred_pass_site_h = "662732";
+  if (!creds.cred_company_site_i) creds.cred_company_site_i = "M01A02";
+  if (!creds.cred_user_site_i) creds.cred_user_site_i = "1";
+  if (!creds.cred_pass_site_i) creds.cred_pass_site_i = "AYGUNLER01";
 
   let tab = null;
   try {
@@ -474,6 +538,10 @@ function autoLoginScriptInPage(siteKey, creds) {
       } else if (siteKey === 'SITE_H') {
         username = creds.cred_user_site_h;
         password = creds.cred_pass_site_h;
+      } else if (siteKey === 'SITE_I') {
+        companyCode = creds.cred_company_site_i;
+        username = creds.cred_user_site_i;
+        password = creds.cred_pass_site_i;
       }
 
       if (!password) {
@@ -487,8 +555,8 @@ function autoLoginScriptInPage(siteKey, creds) {
       passwordInput.dispatchEvent(new Event('change', { bubbles: true }));
 
       let usernameInput = null;
-      if (siteKey === 'SITE_C') {
-        // Yaşar Teknik özel input ID'leri
+      if (siteKey === 'SITE_C' || siteKey === 'SITE_I') {
+        // Yaşar Teknik ve Tok Ticaret özel input ID'leri
         usernameInput = document.getElementById('KullaniciKodu');
         const companyInput = document.getElementById('KullaniciAdiForm') || document.getElementById('KullaniciAdi');
 
@@ -524,6 +592,8 @@ function autoLoginScriptInPage(siteKey, creds) {
           loginButton = document.getElementById('login-btn') || document.querySelector('.submit_button_blue') || document.querySelector('.orange-btn');
         } else if (siteKey === 'SITE_C') {
           loginButton = document.querySelector('.btnGonder') || document.querySelector('button.btnGonder');
+        } else if (siteKey === 'SITE_I') {
+          loginButton = document.querySelector('.btnLogin') || document.querySelector('button.btnLogin');
         }
 
         // Genel olarak form içindeki submit butonlarını ara

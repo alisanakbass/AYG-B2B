@@ -4,6 +4,7 @@ import { initDiscounts, calculateTotalDiscountForProduct, renderKeywordDiscountR
 import { renderCart, renderReports, confirmCart, submitCart, salesHistoryPageIndex, setSalesHistoryPageIndex, salesFilters, transferCartToAygOrder, sendProductToAygOrder } from './modules/cart.js';
 import { loadFiratStats, loadDefaultExcelIfEmpty, setupExcelListeners, downloadBlankTeklifExcel } from './modules/excel.js';
 import { checkUpdates, checkAllSessions, executeSearch, recalculateAllResults, applySorting, renderResults, updateBulkDiscountBarVisibility } from './modules/search.js';
+import { initSantiyeModule, loadGroqSettings, saveGroqSettings } from './modules/santiye.js';
 
 // AYG Sipariş Seçim Modu Algılama
 const urlParams = new URLSearchParams(window.location.search);
@@ -801,25 +802,48 @@ function setupUIEventListeners() {
   // --- SAYFA GEÇİŞ KONTROLLERİ ---
   const navSearchBtn = document.getElementById('nav-search-btn');
   const navSettingsBtn = document.getElementById('nav-settings-btn');
+  const navSantiyeBtn = document.getElementById('nav-santiye-btn');
   const pageSearch = document.getElementById('page-search');
   const pageSettings = document.getElementById('page-settings');
+  const pageSantiye = document.getElementById('page-santiye');
 
-  if (navSearchBtn && navSettingsBtn && pageSearch && pageSettings) {
-    navSearchBtn.addEventListener('click', () => {
-      navSearchBtn.classList.add('active');
-      navSettingsBtn.classList.remove('active');
-      pageSearch.classList.add('active');
-      pageSettings.classList.remove('active');
+  function switchDashboardPage(activeNav, activePage) {
+    [navSearchBtn, navSettingsBtn, navSantiyeBtn].forEach(btn => {
+      if (btn) btn.classList.remove('active');
+    });
+    [pageSearch, pageSettings, pageSantiye].forEach(p => {
+      if (p) {
+        p.classList.remove('active');
+        p.style.display = 'none';
+      }
     });
 
+    if (activeNav) activeNav.classList.add('active');
+    if (activePage) {
+      activePage.classList.add('active');
+      activePage.style.display = 'block';
+    }
+  }
+
+  if (navSearchBtn) {
+    navSearchBtn.addEventListener('click', () => {
+      switchDashboardPage(navSearchBtn, pageSearch);
+    });
+  }
+
+  if (navSettingsBtn) {
     navSettingsBtn.addEventListener('click', () => {
-      navSettingsBtn.classList.add('active');
-      navSearchBtn.classList.remove('active');
-      pageSearch.classList.remove('active');
-      pageSettings.classList.add('active');
+      switchDashboardPage(navSettingsBtn, pageSettings);
       renderReports();
       renderKeywordDiscountRules();
       renderProductDiscountRules();
+      syncGroqSettingsToUI();
+    });
+  }
+
+  if (navSantiyeBtn) {
+    navSantiyeBtn.addEventListener('click', () => {
+      switchDashboardPage(navSantiyeBtn, pageSantiye);
     });
   }
 
@@ -1346,6 +1370,75 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   }
+
+  // --- GROQ AI & OCR AYARLARI VE ŞANTİYE MODÜLÜ ENTEGRASYONU ---
+  async function syncGroqSettingsToUI() {
+    const s = await loadGroqSettings();
+    const apiKeyInput = document.getElementById('groq-api-key-input');
+    const modelSelect = document.getElementById('groq-default-model-select');
+    const pageModelSelect = document.getElementById('santiye-model-select');
+    const ocrKeyInput = document.getElementById('ocr-space-api-key-input');
+    if (apiKeyInput && s.groqApiKey) apiKeyInput.value = s.groqApiKey;
+    if (modelSelect && s.selectedModel) modelSelect.value = s.selectedModel;
+    if (pageModelSelect && s.selectedModel) pageModelSelect.value = s.selectedModel;
+    if (ocrKeyInput && s.ocrSpaceApiKey) ocrKeyInput.value = s.ocrSpaceApiKey;
+  }
+
+  const btnSaveGroq = document.getElementById('btn-save-groq-settings');
+  if (btnSaveGroq) {
+    btnSaveGroq.addEventListener('click', async () => {
+      const apiKey = document.getElementById('groq-api-key-input')?.value || '';
+      const model = document.getElementById('groq-default-model-select')?.value || 'qwen/qwen3.8-27b';
+      const ocrKey = document.getElementById('ocr-space-api-key-input')?.value || '';
+      await saveGroqSettings(apiKey, model, ocrKey);
+      const pageModelSelect = document.getElementById('santiye-model-select');
+      if (pageModelSelect) pageModelSelect.value = model;
+
+      const statusSpan = document.getElementById('groq-save-status');
+      if (statusSpan) {
+        statusSpan.style.display = 'inline-block';
+        setTimeout(() => {
+          statusSpan.style.display = 'none';
+        }, 2500);
+      }
+    });
+  }
+
+  const btnToggleGroqKey = document.getElementById('btn-toggle-groq-key-visibility');
+  if (btnToggleGroqKey) {
+    btnToggleGroqKey.addEventListener('click', () => {
+      const input = document.getElementById('groq-api-key-input');
+      if (input) {
+        if (input.type === 'password') {
+          input.type = 'text';
+          btnToggleGroqKey.textContent = '🔒 Gizle';
+        } else {
+          input.type = 'password';
+          btnToggleGroqKey.textContent = '👁️ Göster';
+        }
+      }
+    });
+  }
+
+  // Şantiye modülünü ve Groq ayarlarını başlat
+  initSantiyeModule();
+  syncGroqSettingsToUI();
+
+  // Eklenti açıldığında Tok Ticaret ve Yaşar Teknik oturumlarını arka planda sessizce hazırla
+  setTimeout(() => {
+    chrome.storage.local.get(['session_SITE_I', 'session_SITE_C'], (res) => {
+      if (!res.session_SITE_I) {
+        chrome.runtime.sendMessage({ action: "manual_login", siteKey: "SITE_I" }, () => {
+          checkAllSessions();
+        });
+      }
+      if (!res.session_SITE_C) {
+        chrome.runtime.sendMessage({ action: "manual_login", siteKey: "SITE_C" }, () => {
+          checkAllSessions();
+        });
+      }
+    });
+  }, 400);
 });
 
 // Görsel yüklenemediğinde çalışan merkezi hata yakalayıcı (CSP Uyumlu & Optimize Edilmiş)

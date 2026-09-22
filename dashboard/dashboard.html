@@ -13,6 +13,8 @@
     <link rel="icon" href="../logo.png" type="image/png" />
     <script src="../xlsx.full.min.js"></script>
     <script src="../jszip.min.js"></script>
+    <script src="../pdf.min.js"></script>
+    <script src="../tesseract.min.js"></script>
   </head>
   <body>
     <div
@@ -101,6 +103,25 @@
               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
             <span>Ara</span>
+          </button>
+          <button id="nav-santiye-btn" class="menu-btn" title="Evrak AI / Fatura ve Sipariş Analizi">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            <span>Evrak AI</span>
           </button>
           <button id="nav-settings-btn" class="menu-btn">
             <svg
@@ -871,6 +892,9 @@
               </button>
               <button class="tab-btn" data-tab="tab-reports">
                 Satış & Kâr Raporları
+              </button>
+              <button class="tab-btn" data-tab="tab-groq-ai">
+                🤖 Groq AI & Şantiye
               </button>
             </div>
 
@@ -2661,6 +2685,447 @@
                   >
                 </div>
               </div>
+            </div>
+
+            <!-- Groq AI & Şantiye Ayarları Sekmesi -->
+            <div class="tab-content" id="tab-groq-ai">
+              <div
+                class="settings-group"
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 20px;
+                  padding: 24px;
+                  background: #ffffff;
+                  border: 1px solid var(--border);
+                  border-radius: 12px;
+                  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+                  max-width: 800px;
+                "
+              >
+                <div style="display: flex; align-items: center; gap: 12px">
+                  <span style="font-size: 28px">🤖</span>
+                  <div>
+                    <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--text)">
+                      Evrak AI & Groq Ayarları
+                    </h3>
+                    <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--text-muted)">
+                      Yüklenen evraklar OCR motoru ile taranır ve Groq AI ile analiz edilerek teklif kalemlerine dönüştürülür.
+                    </p>
+                  </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px">
+                  <label for="groq-api-key-input" style="font-size: 13px; font-weight: 600; color: var(--text)">
+                    Groq API Anahtarı (GROQ_API_KEY)
+                  </label>
+                  <div style="display: flex; gap: 8px">
+                    <input
+                      type="password"
+                      id="groq-api-key-input"
+                      placeholder="gsk_..."
+                      style="
+                        flex: 1;
+                        padding: 10px 14px;
+                        background: var(--bg-input);
+                        border: 1px solid var(--border);
+                        border-radius: 8px;
+                        font-family: monospace;
+                        font-size: 13px;
+                        color: var(--text);
+                      "
+                    />
+                    <button
+                      type="button"
+                      id="btn-toggle-groq-key-visibility"
+                      class="btn-secondary"
+                      style="padding: 0 14px; font-size: 12px"
+                    >
+                      👁️ Göster
+                    </button>
+                  </div>
+                  <span style="font-size: 11.5px; color: var(--text-muted)">
+                    Anahtarınız tarayıcınızın yerel hafızasında (chrome.storage) güvenle saklanır. Ücretsiz anahtar için <a href="https://console.groq.com/keys" target="_blank" style="color: #3b82f6; text-decoration: underline">console.groq.com</a> adresini ziyaret edebilirsiniz.
+                  </span>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px">
+                  <label for="groq-default-model-select" style="font-size: 13px; font-weight: 600; color: var(--text)">
+                    Varsayılan Analiz Modeli
+                  </label>
+                  <select
+                    id="groq-default-model-select"
+                    style="
+                      padding: 10px 14px;
+                      background: var(--bg-input);
+                      border: 1px solid var(--border);
+                      border-radius: 8px;
+                      font-family: var(--font);
+                      font-size: 13px;
+                      color: var(--text);
+                    "
+                  >
+                    <option value="qwen/qwen3.8-27b" selected>⚡ Groq Qwen 27B (Önerilen - Ultra Hızlı & Hassas)</option>
+                    <option value="openai/gpt-oss-120b">🧠 Groq GPT-OSS 120B (Gelişmiş Muhakeme)</option>
+                  </select>
+                </div>
+
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px">
+                  <button
+                    id="btn-save-groq-settings"
+                    class="btn-primary"
+                    style="
+                      background: linear-gradient(135deg, #3b82f6, #2563eb);
+                      color: white;
+                      border: none;
+                      padding: 10px 24px;
+                      border-radius: 8px;
+                      font-weight: 600;
+                      cursor: pointer;
+                    "
+                  >
+                    💾 Ayarları Kaydet
+                  </button>
+                  <span id="groq-save-status" style="font-size: 13px; font-weight: 500; display: none; color: #10b981">
+                    ✓ Ayarlar başarıyla kaydedildi!
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- ŞANTİYE VE MALZEME EVRAK ANALİZİ SAYFASI -->
+        <!-- ========================================== -->
+        <div id="page-santiye" class="dashboard-page" style="display: none">
+          <div class="santiye-header" style="margin-bottom: 24px">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px">
+              <div>
+                <h2 style="font-size: 22px; font-weight: 700; color: var(--text); margin: 0; display: flex; align-items: center; gap: 10px">
+                  <span>📄</span> Evrak AI
+                </h2>
+                <p style="margin: 6px 0 0 0; font-size: 13.5px; color: var(--text-muted)">
+                  Müşterilerden gelen fatura, irsaliye, şantiye fişi, el yazısı sipariş veya WhatsApp görselini yükleyin; <b>OCR + Groq AI</b> okusun ve anında teklife dönüştürün.
+                </p>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 10px">
+                <label for="santiye-model-select" style="font-size: 12.5px; font-weight: 600; color: var(--text-muted)">Model:</label>
+                <select
+                  id="santiye-model-select"
+                  style="
+                    padding: 6px 12px;
+                    border-radius: 8px;
+                    border: 1px solid var(--border);
+                    background: var(--bg-card);
+                    color: var(--text);
+                    font-size: 12.5px;
+                    font-weight: 500;
+                  "
+                >
+                  <option value="qwen/qwen3.8-27b" selected>⚡ Groq Qwen 27B (Önerilen)</option>
+                  <option value="openai/gpt-oss-120b">🧠 Groq GPT-OSS 120B</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Yükleme & Önizleme Bölümü (Grid) -->
+          <div class="santiye-upload-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px">
+            <!-- Sol: Sürükle Bırak Kutusu -->
+            <div
+              class="santiye-card"
+              style="
+                background: var(--bg-card);
+                border: 1px solid var(--border);
+                border-radius: 12px;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+              "
+            >
+              <h3 style="font-size: 14px; font-weight: 700; margin: 0 0 12px 0; color: var(--text); text-transform: uppercase; letter-spacing: 0.5px">
+                1. Belgeyi Seçin veya Bırakın
+              </h3>
+
+              <div
+                id="santiye-dropzone"
+                class="santiye-dropzone"
+                style="
+                  flex: 1;
+                  min-height: 220px;
+                  border: 2px dashed #3b82f6;
+                  border-radius: 12px;
+                  background: rgba(59, 130, 246, 0.03);
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  cursor: pointer;
+                  padding: 20px;
+                  text-align: center;
+                  transition: all 0.2s ease;
+                "
+              >
+                <div style="font-size: 40px; margin-bottom: 10px">📁</div>
+                <div style="font-weight: 600; font-size: 14px; color: var(--text); margin-bottom: 6px">
+                  Görsel (JPG, PNG) veya PDF Evrakını Buraya Sürükleyin
+                </div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px">
+                  veya dosya seçmek için bu alana tıklayın
+                </div>
+                <span
+                  style="
+                    background: #3b82f6;
+                    color: white;
+                    padding: 6px 16px;
+                    border-radius: 20px;
+                    font-size: 12px;
+                    font-weight: 600;
+                  "
+                >
+                  Dosya Seç
+                </span>
+                <input
+                  type="file"
+                  id="santiye-file-input"
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  style="display: none"
+                />
+              </div>
+
+              <!-- Önizleme Kutusu (Dosya Yüklendiğinde Görünür) -->
+              <div
+                id="santiye-preview-box"
+                style="
+                  display: none;
+                  flex: 1;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  background: rgba(0, 0, 0, 0.02);
+                  border: 1px solid var(--border);
+                  border-radius: 12px;
+                  padding: 16px;
+                  position: relative;
+                "
+              >
+                <img
+                  id="santiye-preview-img"
+                  src=""
+                  alt="Belge Önizleme"
+                  style="
+                    max-width: 100%;
+                    max-height: 260px;
+                    object-fit: contain;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+                    margin-bottom: 12px;
+                  "
+                />
+                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%">
+                  <span id="santiye-preview-info" style="font-size: 12.5px; font-weight: 600; color: var(--text)"></span>
+                  <button
+                    id="btn-santiye-remove-file"
+                    style="
+                      background: rgba(239, 68, 68, 0.1);
+                      color: #ef4444;
+                      border: 1px solid rgba(239, 68, 68, 0.2);
+                      border-radius: 6px;
+                      padding: 4px 10px;
+                      font-size: 12px;
+                      font-weight: 600;
+                      cursor: pointer;
+                    "
+                  >
+                    ✕ Değiştir
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sağ: Bilgilendirme ve Analiz Başlatma Kartı -->
+            <div
+              class="santiye-card"
+              style="
+                background: var(--bg-card);
+                border: 1px solid var(--border);
+                border-radius: 12px;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+              "
+            >
+              <div>
+                <h3 style="font-size: 14px; font-weight: 700; margin: 0 0 12px 0; color: var(--text); text-transform: uppercase; letter-spacing: 0.5px">
+                  2. Otomasyon & Analiz
+                </h3>
+                <div style="font-size: 13px; color: var(--text-muted); line-height: 1.6">
+                  <p style="margin: 0 0 10px 0">
+                    Evraktaki el yazısı veya basılı malzeme kalemleri, Türkçe birimler ve miktarlar Groq Vision modelleriyle yüksek hassasiyetle okunur.
+                  </p>
+                  <ul style="margin: 0; padding-left: 18px">
+                    <li>Müşteri adı, şantiye/sevk adresi ve belge tarihi otomatik tespit edilir.</li>
+                    <li>Malzeme adları ve ölçüleri tam olarak ayıklanır.</li>
+                    <li>Sonuçlar ekranda anında düzenlenebilir tabloda sunulur.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div style="margin-top: 20px">
+                <div
+                  id="santiye-status-container"
+                  style="
+                    display: none;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 12px 16px;
+                    background: rgba(59, 130, 246, 0.08);
+                    border: 1px solid rgba(59, 130, 246, 0.2);
+                    border-radius: 8px;
+                    margin-bottom: 12px;
+                  "
+                >
+                  <div class="spinner-small" style="width: 18px; height: 18px; border: 2px solid #3b82f6; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                  <span id="santiye-status-text" style="font-size: 12.5px; font-weight: 500; color: #2563eb">
+                    İşlem yapılıyor...
+                  </span>
+                </div>
+
+                <button
+                  id="btn-santiye-analiz-et"
+                  disabled
+                  style="
+                    width: 100%;
+                    padding: 14px;
+                    background: linear-gradient(135deg, #10b981, #059669);
+                    color: white;
+                    border: none;
+                    border-radius: 10px;
+                    font-size: 14.5px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+                    transition: all 0.2s ease;
+                  "
+                >
+                  <span>🚀 Belgeyi Oku ve Malzemeleri Çıkar</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Sonuçlar ve Tablo Kartı (Analiz sonrası görünür) -->
+          <div
+            id="santiye-results-card"
+            class="santiye-card"
+            style="
+              display: none;
+              background: var(--bg-card);
+              border: 1px solid var(--border);
+              border-radius: 12px;
+              padding: 24px;
+              box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+            "
+          >
+            <!-- Üst Bilgiler (Müşteri, Şantiye, Tarih) -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 12px">
+              <div style="display: flex; align-items: center; gap: 10px">
+                <h3 style="font-size: 16px; font-weight: 700; margin: 0; color: var(--text)">
+                  📋 Tespit Edilen Bilgiler & Malzeme Listesi
+                </h3>
+                <span id="santiye-item-count-badge" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 12px">
+                  0 Kalem Bulundu
+                </span>
+              </div>
+
+              <div style="display: flex; gap: 10px">
+                <button
+                  id="btn-santiye-add-row"
+                  style="
+                    background: var(--bg-input);
+                    border: 1px solid var(--border);
+                    color: var(--text);
+                    padding: 8px 14px;
+                    border-radius: 8px;
+                    font-size: 12.5px;
+                    font-weight: 600;
+                    cursor: pointer;
+                  "
+                >
+                  + Satır Ekle
+                </button>
+                <button
+                  id="btn-santiye-export-excel"
+                  style="
+                    background: linear-gradient(135deg, #10b981, #059669);
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 8px;
+                    font-size: 12.5px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.2);
+                  "
+                >
+                  📄 Boş Fiyatlı Teklif Excel'i İndir
+                </button>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 180px; gap: 14px; margin-bottom: 20px">
+              <div>
+                <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px">Müşteri / Firma Adı (C10):</label>
+                <input
+                  type="text"
+                  id="santiye-musteri-adi"
+                  placeholder="Müşteri veya firma adı..."
+                  style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; color: var(--text)"
+                />
+              </div>
+              <div>
+                <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px">Şantiye / Sevk Adresi (C13):</label>
+                <input
+                  type="text"
+                  id="santiye-adresi"
+                  placeholder="Şantiye veya teslimat adresi..."
+                  style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; color: var(--text)"
+                />
+              </div>
+              <div>
+                <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px">Belge Tarihi (K12):</label>
+                <input
+                  type="text"
+                  id="santiye-tarih"
+                  placeholder="DD.MM.YYYY"
+                  style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; color: var(--text)"
+                />
+              </div>
+            </div>
+
+            <!-- Malzeme Tablosu -->
+            <div style="overflow-x: auto; border: 1px solid var(--border); border-radius: 8px">
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left">
+                <thead>
+                  <tr style="background: rgba(0, 0, 0, 0.03); border-bottom: 1px solid var(--border)">
+                    <th style="padding: 10px 12px; width: 50px; text-align: center">Sıra</th>
+                    <th style="padding: 10px 12px">Malzeme / Ürün Açıklaması (Sütun D)</th>
+                    <th style="padding: 10px 12px; width: 110px">Birim (I)</th>
+                    <th style="padding: 10px 12px; width: 100px; text-align: right">Miktar (J)</th>
+                    <th style="padding: 10px 12px; width: 140px; text-align: center">B2B / İşlem</th>
+                  </tr>
+                </thead>
+                <tbody id="santiye-table-body">
+                  <!-- JS ile dinamik doldurulur -->
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

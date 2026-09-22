@@ -515,8 +515,8 @@ export async function executeSearch() {
 }
 
 // Tek Bir B2B Sitesinden Veri Çekme
-export async function fetchFromB2B(siteKey, query) {
-  updateStatusIndicator(siteKey, 'loading', 'Aranıyor...');
+export async function fetchFromB2B(siteKey, query, isRetry = false) {
+  updateStatusIndicator(siteKey, 'loading', isRetry ? 'Yeniden Deneniyor...' : 'Aranıyor...');
 
   if (siteKey === 'SITE_F') {
     const { fetchFromLocalFirat } = await import('./excel.js');
@@ -1403,11 +1403,27 @@ export async function fetchFromB2B(siteKey, query) {
 
     console.log(`[B2B Fetch Debug] Site: ${siteKey}, URL: ${searchUrl}`);
     console.log(`[B2B Fetch Debug] HTML Uzunluğu: ${htmlText.length} karakter`);
-    console.log(`[B2B Fetch Debug] Giriş formu şifre alanı var mı: ${!!doc.querySelector('input[type="password"]')}`);
-    console.log(`[B2B Fetch Debug] Arama kutusu (#aranan) var mı: ${!!doc.getElementById('aranan')}`);
-    console.log(`[B2B Fetch Debug] Sayfada 'prbx-item' sayısı: ${doc.querySelectorAll('.prbx-item').length}`);
-    console.log(`[B2B Fetch Debug] Sayfada 'fiyat-box-item' sayısı: ${doc.querySelectorAll('.fiyat-box-item').length}`);
-    console.log(`[B2B Fetch Debug] Sayfadaki tüm HTML içinde 'prbx' kelimesi geçiyor mu: ${htmlText.includes('prbx')}`);
+
+    // Oturum Kapalı / Giriş Sayfası Tespiti (Tok Ticaret & Yaşar Teknik)
+    const isLoginPage = htmlText.includes('frmLogin') || 
+                        htmlText.includes('Login.asp') || 
+                        htmlText.includes('KullaniciAdiForm') || 
+                        htmlText.includes('KullaniciKodu') ||
+                        !!doc.querySelector('input[type="password"]');
+
+    if (isLoginPage && (siteKey === 'SITE_I' || siteKey === 'SITE_C') && !isRetry) {
+      console.log(`[B2B Portal] ${siteKey} (${PARSERS[siteKey]?.name}) oturumu kapalı tespit edildi! Otomatik arka plan girişi yapılıyor...`);
+      updateStatusIndicator(siteKey, 'loading', 'Giriş Yapılıyor...');
+
+      await new Promise(resolve => {
+        chrome.runtime.sendMessage({ action: "manual_login", siteKey: siteKey }, (res) => {
+          resolve(res);
+        });
+      });
+
+      console.log(`[B2B Portal] ${siteKey} otomatik giriş tamamlandı, arama yeniden tetikleniyor...`);
+      return fetchFromB2B(siteKey, query, true);
+    }
 
     const config = PARSERS[siteKey];
     const rows = doc.querySelectorAll(config.rowSelector);

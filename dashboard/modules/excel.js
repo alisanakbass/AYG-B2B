@@ -778,3 +778,340 @@ export async function downloadBlankTeklifExcel(customFilename) {
     alert("Boş teklif Excel dosyası indirilirken bir hata oluştu: " + err.message);
   }
 }
+
+// Şantiye Evrak Analizinden Gelen Verileri Şablona Yazıp İndiren Fonksiyon
+export async function exportSantiyeOfferAsExcel(santiyeData) {
+  try {
+    const kalemler = santiyeData?.kalemler || [];
+    if (kalemler.length === 0) {
+      alert("Dışa aktarılacak malzeme kalemi bulunamadı.");
+      return;
+    }
+
+    let templateUrl = "../AYG_TEKLİF.xlsx";
+    if (typeof chrome !== 'undefined' && chrome?.runtime?.getURL) {
+      templateUrl = chrome.runtime.getURL("AYG_TEKLİF.xlsx");
+    }
+
+    const response = await fetch(templateUrl);
+    if (!response.ok) {
+      throw new Error(`Teklif şablonu yüklenemedi: HTTP ${response.status}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+
+    if (typeof JSZip === 'undefined') {
+      throw new Error("JSZip kütüphanesi yüklenemedi. Lütfen sayfayı yenileyin.");
+    }
+
+    const zip = new JSZip();
+    await zip.loadAsync(arrayBuffer);
+
+    const sheetXmlText = await zip.file("xl/worksheets/sheet1.xml").async("string");
+    const stylesXmlText = await zip.file("xl/styles.xml").async("string");
+
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(sheetXmlText, "application/xml");
+    const stylesDoc = parser.parseFromString(stylesXmlText, "application/xml");
+    const ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+    function colToNumber(col) {
+      let num = 0;
+      for (let i = 0; i < col.length; i++) {
+        num = num * 26 + (col.charCodeAt(i) - 64);
+      }
+      return num;
+    }
+
+    function findRow(r) {
+      const rows = xmlDoc.getElementsByTagNameNS(ns, "row");
+      for (let i = 0; i < rows.length; i++) {
+        if (rows[i].getAttribute("r") === String(r)) return rows[i];
+      }
+      return null;
+    }
+
+    function findCell(rowNode, addr) {
+      const cells = rowNode.getElementsByTagNameNS(ns, "c");
+      for (let i = 0; i < cells.length; i++) {
+        if (cells[i].getAttribute("r") === addr) return cells[i];
+      }
+      return null;
+    }
+
+    function setCell(r, c, val, type, formula, styleId) {
+      const addr = `${c}${r}`;
+      let rowNode = findRow(r);
+      if (!rowNode) {
+        rowNode = xmlDoc.createElementNS(ns, "row");
+        rowNode.setAttribute("r", String(r));
+        const sheetData = xmlDoc.getElementsByTagNameNS(ns, "sheetData")[0];
+        if (sheetData) {
+          const siblingRows = sheetData.getElementsByTagNameNS(ns, "row");
+          let inserted = false;
+          for (let i = 0; i < siblingRows.length; i++) {
+            const siblingR = parseInt(siblingRows[i].getAttribute("r"), 10);
+            if (siblingR > r) {
+              sheetData.insertBefore(rowNode, siblingRows[i]);
+              inserted = true;
+              break;
+            }
+          }
+          if (!inserted) sheetData.appendChild(rowNode);
+        } else {
+          return;
+        }
+      }
+
+      let cell = findCell(rowNode, addr);
+      if (!cell) {
+        cell = xmlDoc.createElementNS(ns, "c");
+        cell.setAttribute("r", addr);
+        const colNum = colToNumber(c);
+        const cells = rowNode.getElementsByTagNameNS(ns, "c");
+        let inserted = false;
+        for (let i = 0; i < cells.length; i++) {
+          const cAddr = cells[i].getAttribute("r");
+          const cCol = cAddr.replace(/[0-9]/g, "");
+          if (colToNumber(cCol) > colNum) {
+            rowNode.insertBefore(cell, cells[i]);
+            inserted = true;
+            break;
+          }
+        }
+        if (!inserted) rowNode.appendChild(cell);
+      }
+
+      if (styleId !== undefined) {
+        cell.setAttribute("s", String(styleId));
+      }
+
+      if (formula) {
+        let fNode = cell.getElementsByTagNameNS(ns, "f")[0];
+        if (!fNode) {
+          fNode = xmlDoc.createElementNS(ns, "f");
+          cell.appendChild(fNode);
+        }
+        fNode.textContent = formula;
+      } else {
+        const fNode = cell.getElementsByTagNameNS(ns, "f")[0];
+        if (fNode) cell.removeChild(fNode);
+      }
+
+      if (val !== undefined && val !== null && val !== "") {
+        if (type === "s") {
+          cell.setAttribute("t", "inlineStr");
+          let isNode = cell.getElementsByTagNameNS(ns, "is")[0];
+          if (!isNode) {
+            isNode = xmlDoc.createElementNS(ns, "is");
+            cell.appendChild(isNode);
+          }
+          let tNode = isNode.getElementsByTagNameNS(ns, "t")[0];
+          if (!tNode) {
+            tNode = xmlDoc.createElementNS(ns, "t");
+            isNode.appendChild(tNode);
+          }
+          tNode.textContent = String(val);
+          const vNode = cell.getElementsByTagNameNS(ns, "v")[0];
+          if (vNode) cell.removeChild(vNode);
+        } else {
+          cell.removeAttribute("t");
+          let vNode = cell.getElementsByTagNameNS(ns, "v")[0];
+          if (!vNode) {
+            vNode = xmlDoc.createElementNS(ns, "v");
+            cell.appendChild(vNode);
+          }
+          vNode.textContent = String(val);
+        }
+      } else if (!formula) {
+        const vNode = cell.getElementsByTagNameNS(ns, "v")[0];
+        if (vNode) cell.removeChild(vNode);
+        const isNode = cell.getElementsByTagNameNS(ns, "is")[0];
+        if (isNode) cell.removeChild(isNode);
+      }
+    }
+
+    // Tarih ve Teklif No
+    const bugunTarih = new Date().toLocaleDateString('tr-TR');
+    const belgeTarihi = santiyeData?.talep_tarihi || bugunTarih;
+    const teklifNo = "AYG-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "-" + Math.floor(1000 + Math.random() * 9000);
+
+    setCell(11, 'L', teklifNo, 's');
+    setCell(12, 'L', belgeTarihi, 's');
+
+    // Müşteri ve Şantiye Bilgileri
+    const musteriAdi = santiyeData?.musteri_adi || "";
+    const santiyeAdi = santiyeData?.santiye_adi || "";
+
+    // B10'da sabit "SAYIN:" başlığı vardır; müşteri adı C10:F10 geniş birleşik alanına yazılır.
+    setCell(10, 'C', musteriAdi, 's');
+    // B13'te sabit "SEVK ADRESİ:" başlığı vardır; şantiye adı C13 alanına yazılır.
+    setCell(13, 'C', santiyeAdi, 's');
+
+    // Dinamik Tablo Genişletme (Şablon 18..39 arası 22 satır kapasitelidir)
+    const startRow = 18;
+    const defaultCapacity = 22; // 18..39 arası
+    const splitRow = 40; // Sarı TOPLAM ve altbilgilerin başladığı satır
+
+    if (kalemler.length > defaultCapacity) {
+      const shiftCount = kalemler.length - defaultCapacity;
+      const sheetData = xmlDoc.getElementsByTagNameNS(ns, "sheetData")[0];
+      const allRows = Array.from(sheetData.getElementsByTagNameNS(ns, "row"));
+
+      // 1. 40 ve sonraki tüm satırları aşağı ötele (tersten dolaşarak çakışmayı önle)
+      for (let i = allRows.length - 1; i >= 0; i--) {
+        const rowNode = allRows[i];
+        const oldR = parseInt(rowNode.getAttribute("r"), 10);
+        if (oldR >= splitRow) {
+          const newR = oldR + shiftCount;
+          rowNode.setAttribute("r", String(newR));
+          const cells = Array.from(rowNode.getElementsByTagNameNS(ns, "c"));
+          for (const cell of cells) {
+            const oldAddr = cell.getAttribute("r");
+            const colLetters = oldAddr.replace(/[0-9]/g, "");
+            cell.setAttribute("r", `${colLetters}${newR}`);
+          }
+        }
+      }
+
+      // 2. 39. satırın şablon stillerini referans al
+      const refRow = findRow(39);
+
+      // 3. Araya 40'tan 40+shiftCount-1'e kadar yeni ürün satırları ekle
+      const firstShiftedRow = findRow(splitRow + shiftCount);
+      for (let r = splitRow; r < splitRow + shiftCount; r++) {
+        const newRow = xmlDoc.createElementNS(ns, "row");
+        newRow.setAttribute("r", String(r));
+        if (refRow) {
+          if (refRow.getAttribute("ht")) newRow.setAttribute("ht", refRow.getAttribute("ht"));
+          if (refRow.getAttribute("customHeight")) newRow.setAttribute("customHeight", refRow.getAttribute("customHeight"));
+
+          const refCells = Array.from(refRow.getElementsByTagNameNS(ns, "c"));
+          for (const refCell of refCells) {
+            const refAddr = refCell.getAttribute("r");
+            const colLetters = refAddr.replace(/[0-9]/g, "");
+            const newCell = xmlDoc.createElementNS(ns, "c");
+            newCell.setAttribute("r", `${colLetters}${r}`);
+            if (refCell.getAttribute("s")) {
+              newCell.setAttribute("s", refCell.getAttribute("s"));
+            }
+            newRow.appendChild(newCell);
+          }
+        }
+
+        if (firstShiftedRow) {
+          sheetData.insertBefore(newRow, firstShiftedRow);
+        } else {
+          sheetData.appendChild(newRow);
+        }
+      }
+
+      // 4. MergeCells (Birleşik Hücreler) koordinatlarını güncelle
+      const mergeCellsNodes = xmlDoc.getElementsByTagNameNS(ns, "mergeCells");
+      if (mergeCellsNodes && mergeCellsNodes.length > 0) {
+        const mergeCells = mergeCellsNodes[0];
+        const mergeList = Array.from(mergeCells.getElementsByTagNameNS(ns, "mergeCell"));
+
+        for (const mc of mergeList) {
+          const ref = mc.getAttribute("ref") || "";
+          const parts = ref.split(":");
+          if (parts.length === 2) {
+            const startCol = parts[0].replace(/[0-9]/g, "");
+            const startR = parseInt(parts[0].replace(/[^0-9]/g, ""), 10);
+            const endCol = parts[1].replace(/[0-9]/g, "");
+            const endR = parseInt(parts[1].replace(/[^0-9]/g, ""), 10);
+
+            if (startR >= splitRow) {
+              const newStartR = startR + shiftCount;
+              const newEndR = endR + shiftCount;
+              mc.setAttribute("ref", `${startCol}${newStartR}:${endCol}${newEndR}`);
+            }
+          }
+        }
+
+        // Yeni satırlar için ürün birleştirmelerini ekle (B:C, D:H, J:K)
+        for (let r = splitRow; r < splitRow + shiftCount; r++) {
+          const m1 = xmlDoc.createElementNS(ns, "mergeCell");
+          m1.setAttribute("ref", `B${r}:C${r}`);
+          mergeCells.appendChild(m1);
+
+          const m2 = xmlDoc.createElementNS(ns, "mergeCell");
+          m2.setAttribute("ref", `D${r}:H${r}`);
+          mergeCells.appendChild(m2);
+
+          const m3 = xmlDoc.createElementNS(ns, "mergeCell");
+          m3.setAttribute("ref", `J${r}:K${r}`);
+          mergeCells.appendChild(m3);
+        }
+
+        const currentCount = parseInt(mergeCells.getAttribute("count") || "0", 10);
+        mergeCells.setAttribute("count", String(currentCount + shiftCount * 3));
+      }
+    }
+
+    // Kalemleri doldur (Fiyat ve Tutar boş kalır)
+    for (let i = 0; i < kalemler.length; i++) {
+      const r = startRow + i;
+      const kalem = kalemler[i];
+      const sira = kalem.sira_no || (i + 1);
+      const urunAdi = kalem.urun_adi || "";
+      const birim = (kalem.birim || "ADET").toUpperCase();
+      const miktar = typeof kalem.miktar === "number" ? kalem.miktar : (parseFloat(String(kalem.miktar).replace(",", ".")) || 0);
+
+      setCell(r, 'B', sira, 'n');
+      setCell(r, 'D', urunAdi, 's');
+      setCell(r, 'I', birim, 's');
+      setCell(r, 'J', miktar, 'n');
+      // L (Birim Fiyat) ve M (Tutar) sütunları BOŞ bırakılır
+      setCell(r, 'L', '', 's');
+      setCell(r, 'M', '', 's');
+    }
+
+    // Toplam satırını belirle (40 veya ötelenmiş satır)
+    const totalRow = splitRow + (kalemler.length > defaultCapacity ? (kalemler.length - defaultCapacity) : 0);
+    setCell(totalRow, 'B', "KDV HARİÇ", 's');
+    setCell(totalRow, 'L', "TOPLAM", 's');
+    setCell(totalRow, 'M', '', 's'); // Tutar boş
+
+    const serializer = new XMLSerializer();
+    const newSheetXmlText = serializer.serializeToString(xmlDoc);
+    const newStylesXmlText = serializer.serializeToString(stylesDoc);
+
+    zip.file("xl/worksheets/sheet1.xml", newSheetXmlText);
+    zip.file("xl/styles.xml", newStylesXmlText);
+
+    // calcChain.xml eski formül kaydını temizle (Excel'in onarım uyarısı vermesini önler)
+    zip.remove("xl/calcChain.xml");
+    try {
+      const ctFile = zip.file("[Content_Types].xml");
+      if (ctFile) {
+        const ctText = await ctFile.async("string");
+        zip.file("[Content_Types].xml", ctText.replace(/<Override[^>]*PartName="\/xl\/calcChain\.xml"[^>]*\/>/g, ""));
+      }
+      const relsFile = zip.file("xl/_rels/workbook.xml.rels");
+      if (relsFile) {
+        const relsText = await relsFile.async("string");
+        zip.file("xl/_rels/workbook.xml.rels", relsText.replace(/<Relationship[^>]*Target="calcChain\.xml"[^>]*\/>/g, ""));
+      }
+    } catch (cleanErr) {
+      console.warn("[B2B Excel] calcChain temizleme uyarısı:", cleanErr);
+    }
+
+    const zipContent = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(zipContent);
+    const a = document.createElement("a");
+    a.href = url;
+
+    // Temiz dosya ismi
+    const cleanMusteri = (musteriAdi || "Musteri").replace(/[^a-zA-Z0-9çğıöşüÇĞİÖŞÜ]/g, "_").substring(0, 30);
+    const cleanTarih = belgeTarihi.replace(/[\.\/\\:]/g, "_");
+    a.download = `Teklif_${cleanMusteri}_${cleanTarih}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error("[B2B Excel] Şantiye teklifi indirme hatası:", err);
+    alert("Teklif Excel dosyası oluşturulurken hata oluştu: " + err.message);
+  }
+}
+

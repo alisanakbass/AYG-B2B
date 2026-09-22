@@ -1599,11 +1599,50 @@ button {
   display: none;
   flex-direction: column;
   height: 100%;
+  overflow-y: auto;
   animation: fadeIn 0.3s ease;
 }
 
 .dashboard-page.active {
   display: flex;
+}
+
+#page-santiye {
+  overflow-y: auto;
+  padding: 24px;
+  flex: 1;
+}
+
+#page-settings {
+  overflow-y: auto;
+  padding: 24px;
+  flex: 1;
+}
+
+/* Sayfa Kaydırma Çubukları */
+.dashboard-page::-webkit-scrollbar,
+#page-santiye::-webkit-scrollbar,
+#page-settings::-webkit-scrollbar {
+  width: 10px;
+}
+.dashboard-page::-webkit-scrollbar-track,
+#page-santiye::-webkit-scrollbar-track,
+#page-settings::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.02);
+  border-radius: 5px;
+}
+.dashboard-page::-webkit-scrollbar-thumb,
+#page-santiye::-webkit-scrollbar-thumb,
+#page-settings::-webkit-scrollbar-thumb {
+  background: rgba(239, 68, 68, 0.4);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.dashboard-page::-webkit-scrollbar-thumb:hover,
+#page-santiye::-webkit-scrollbar-thumb:hover,
+#page-settings::-webkit-scrollbar-thumb:hover {
+  background: rgba(239, 68, 68, 0.8);
 }
 
 @keyframes fadeIn {
@@ -2193,6 +2232,90 @@ button {
 }
 .profit-group:hover .profit-main span[id^="profit-with-vat-"] {
   filter: none !important;
+}
+
+/* ==========================================
+   ŞANTİYE EVRAK ANALİZİ SAYFASI STİLLERİ
+   ========================================== */
+.santiye-dropzone:hover,
+.santiye-dropzone.drag-hover {
+  border-color: #2563eb !important;
+  background: rgba(37, 99, 235, 0.08) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.12);
+}
+
+.santiye-row-input {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text);
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.santiye-row-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+  background: #ffffff;
+}
+
+.btn-santiye-search-row {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-santiye-search-row:hover {
+  background: #2563eb;
+  color: white;
+}
+
+.btn-santiye-delete-row {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-santiye-delete-row:hover {
+  background: #ef4444;
+  color: white;
+}
+
+#santiye-table-body tr {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s ease;
+}
+
+#santiye-table-body tr:hover {
+  background: rgba(59, 130, 246, 0.02);
+}
+
+#santiye-table-body td {
+  padding: 8px 10px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 

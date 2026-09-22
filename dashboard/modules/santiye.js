@@ -1,7 +1,7 @@
 import { exportSantiyeOfferAsExcel } from './excel.js';
 
 // Varsayılan Yapılandırma
-const DEFAULT_GROQ_API_KEY = atob("Z3NrXzNsMlROaUU3QXlMeWt3T3BVbUNiV0dkeWJyRllsdnR6dGFFT056MXQ2cFFPWUoxaWltSQ==");
+const DEFAULT_GROQ_API_KEY = atob("Z3NrX0dWVjFrWWF0b2pNcmdEbmNNbFhPV0dkeWJyRllITFlsbVVONWtveGRGWnNDZUFFVFFzVWg=");
 const DEFAULT_GROQ_MODEL = "qwen/qwen3.8-27b";
 const DEFAULT_OCR_SPACE_KEY = "K81135367288957"; // Kullanıcının kişisel ücretsiz OCR.space anahtarı
 
@@ -22,7 +22,13 @@ export async function loadGroqSettings() {
   return new Promise((resolve) => {
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
       chrome.storage.local.get(['groq_api_key', 'groq_vision_model', 'ocr_space_api_key'], (result) => {
-        santiyeState.groqApiKey = result.groq_api_key || DEFAULT_GROQ_API_KEY;
+        const oldRevokedKey = atob("Z3NrXzNsMlROaUU3QXlMeWt3T3BVbUNiV0dkeWJyRllsdnR6dGFFT056MXQ2cFFPWUoxaWltSQ==");
+        if (result.groq_api_key && result.groq_api_key !== oldRevokedKey) {
+          santiyeState.groqApiKey = result.groq_api_key;
+        } else {
+          santiyeState.groqApiKey = DEFAULT_GROQ_API_KEY;
+          chrome.storage.local.set({ groq_api_key: DEFAULT_GROQ_API_KEY });
+        }
         santiyeState.selectedModel = result.groq_vision_model || DEFAULT_GROQ_MODEL;
         if (result.ocr_space_api_key && result.ocr_space_api_key !== "K87899142388957") {
           santiyeState.ocrSpaceApiKey = result.ocr_space_api_key;

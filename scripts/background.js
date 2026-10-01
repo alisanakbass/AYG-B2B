@@ -8,7 +8,8 @@ const DEFAULT_URLS = {
   SITE_E: "https://bayi.akyuztools.com/Search/SearchProduct",
   SITE_H: "https://b2b.kamilturk.com/Arama/_Prbx?q={query}",
   SITE_I: "https://bayi.tokticaret.com.tr/SiparisGir.asp?sayfa=&FAdi={query}&F=Ara&Sirala=varsayilan",
-  SITE_J: "https://b2b.duzmetal.com/urun/arama?kelime={query}"
+  SITE_J: "https://b2b.duzmetal.com/urun/arama?kelime={query}",
+  SITE_K: "https://b2b.rico.com.tr/Arama/_Prbx?q={query}"
 };
 
 // Eklenti yüklendiğinde veya güncellendiğinde alarmı kur ve kuralları ayarla
@@ -69,13 +70,28 @@ async function setupDeclarativeRules() {
         urlFilter: "||api.duzmetal.com/*",
         resourceTypes: ["xmlhttprequest"]
       }
+    },
+    {
+      id: 4,
+      priority: 1,
+      action: {
+        type: "modifyHeaders",
+        requestHeaders: [
+          { header: "origin", operation: "set", value: "https://b2b.rico.com.tr" },
+          { header: "referer", operation: "set", value: "https://b2b.rico.com.tr/" }
+        ]
+      },
+      condition: {
+        urlFilter: "||b2b.rico.com.tr/*",
+        resourceTypes: ["xmlhttprequest"]
+      }
     }
   ];
 
   try {
     // Eski kuralları temizle ve yenilerini ekle
     await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [1, 2, 3],
+      removeRuleIds: [1, 2, 3, 4],
       addRules: rules
     });
     console.log("[B2B Background] Declarative Net Request kuralları başarıyla tanımlandı.");
@@ -104,6 +120,10 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 // Yaşar Teknik oturumunu sessizce canlı tutan fonksiyon
 async function keepYasarTeknikAlive() {
+  const syncData = await new Promise(r => chrome.storage.sync.get({ 'site-c-check': false }, r));
+  if (!syncData['site-c-check']) {
+    return;
+  }
   try {
     const response = await fetch("https://bayi.yasarteknik.com.tr/Default.asp", {
       method: "GET",
@@ -251,15 +271,17 @@ async function triggerNativeUpdate() {
 // Tüm aktif (işaretli) siteler için otomatik giriş yap
 async function performBackgroundLoginForAll() {
   // Arayüzdeki checkbox durumlarını öğrenmek için storage'dan okuyoruz.
-  // Varsayılan olarak hepsi aktif/true kabul edilir.
+  // Yaşar Teknik ve Polisan varsayılan olarak kapalıdır.
   const storage = await new Promise(r => chrome.storage.sync.get({
     'site-a-check': true,
     'site-b-check': true,
-    'site-c-check': true,
-    'site-d-check': true,
+    'site-c-check': false,
+    'site-d-check': false,
     'site-e-check': true,
     'site-h-check': true,
-    'site-i-check': true
+    'site-i-check': true,
+    'site-j-check': true,
+    'site-k-check': true
   }, r));
 
   const results = {};
@@ -286,6 +308,9 @@ async function performBackgroundLoginForAll() {
   }
   if (storage['site-j-check']) {
     results.SITE_J = await performLoginForSite('SITE_J');
+  }
+  if (storage['site-k-check']) {
+    results.SITE_K = await performLoginForSite('SITE_K');
   }
   return results;
 }
@@ -419,6 +444,43 @@ async function performLoginForSite(siteKey, isManual = false) {
     return { success: false, message: "Düz Metal Giriş Başarısız" };
   }
 
+  if (siteKey === 'SITE_K') {
+    const creds = await new Promise(r => chrome.storage.sync.get({
+      cred_user_site_k: "AYG121",
+      cred_pass_site_k: "25060"
+    }, r));
+
+    const username = creds.cred_user_site_k || "AYG121";
+    const password = creds.cred_pass_site_k || "25060";
+
+    try {
+      console.log(`[B2B Background] Rico B2B sessiz giriş isteği yapılıyor... Kullanıcı: ${username}`);
+      const loginRes = await fetch("https://b2b.rico.com.tr/Giris", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        body: `adi=${encodeURIComponent(username.trim())}&Sifre=${encodeURIComponent(password.trim())}&BeniHatirla=true`
+      });
+
+      if (loginRes.ok) {
+        const data = await loginRes.json();
+        if (data && data.success) {
+          console.log("[B2B Background] Rico B2B sessiz giriş başarılı.");
+          await updateStorageSession('SITE_K', true);
+          return { success: true, message: "Oturum Sessizce Açıldı" };
+        }
+      } else {
+        console.warn(`[B2B Background] Rico B2B sessiz giriş HTTP hatası: ${loginRes.status}`);
+      }
+    } catch (err) {
+      console.error("[B2B Background] Rico B2B sessiz giriş hatası:", err);
+    }
+    console.log("[B2B Background] Rico B2B sessiz giriş başarısız oldu, sekmeli yönteme geçiliyor.");
+  }
+
   if (siteKey === 'SITE_E') {
     // Akyüzler için eğer manuel tıklama yapıldıysa giriş sayfasını yeni sekmede açıyoruz.
     // Arka plan otomatik tetiklemelerinde ise sadece token kontrolü yapıyoruz.
@@ -445,6 +507,8 @@ async function performLoginForSite(siteKey, isManual = false) {
     loginUrl = "https://b2b.kamilturk.com/Login/Login";
   } else if (siteKey === 'SITE_I') {
     loginUrl = "https://bayi.tokticaret.com.tr/Login.asp";
+  } else if (siteKey === 'SITE_K') {
+    loginUrl = "https://b2b.rico.com.tr/";
   } else {
     try {
       // Özelleştirilmiş URL şablonunu al
@@ -480,7 +544,9 @@ async function performLoginForSite(siteKey, isManual = false) {
     cred_pass_site_h: "662732",
     cred_company_site_i: "M01A02",
     cred_user_site_i: "1",
-    cred_pass_site_i: "AYGUNLER01"
+    cred_pass_site_i: "AYGUNLER01",
+    cred_user_site_k: "AYG121",
+    cred_pass_site_k: "25060"
   }, r));
 
   // Eğer sync storage'da boş string olarak kayıtlıysa varsayılan değerleri atayalım
@@ -498,6 +564,8 @@ async function performLoginForSite(siteKey, isManual = false) {
   if (!creds.cred_company_site_i) creds.cred_company_site_i = "M01A02";
   if (!creds.cred_user_site_i) creds.cred_user_site_i = "1";
   if (!creds.cred_pass_site_i) creds.cred_pass_site_i = "AYGUNLER01";
+  if (!creds.cred_user_site_k) creds.cred_user_site_k = "AYG121";
+  if (!creds.cred_pass_site_k) creds.cred_pass_site_k = "25060";
 
   let tab = null;
   try {
@@ -632,6 +700,9 @@ function autoLoginScriptInPage(siteKey, creds) {
         companyCode = creds.cred_company_site_i;
         username = creds.cred_user_site_i;
         password = creds.cred_pass_site_i;
+      } else if (siteKey === 'SITE_K') {
+        username = creds.cred_user_site_k;
+        password = creds.cred_pass_site_k;
       }
 
       if (!password) {
@@ -684,6 +755,8 @@ function autoLoginScriptInPage(siteKey, creds) {
           loginButton = document.querySelector('.btnGonder') || document.querySelector('button.btnGonder');
         } else if (siteKey === 'SITE_I') {
           loginButton = document.querySelector('.btnLogin') || document.querySelector('button.btnLogin');
+        } else if (siteKey === 'SITE_K') {
+          loginButton = document.querySelector('button[name="Giris"]') || document.querySelector('#LoginForm button[type="submit"]');
         }
 
         // Genel olarak form içindeki submit butonlarını ara

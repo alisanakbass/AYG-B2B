@@ -223,7 +223,7 @@
             </div>
             <div class="site-item" data-site="SITE_C">
               <label class="site-checkbox-label">
-                <input type="checkbox" id="site-c-check" checked />
+                <input type="checkbox" id="site-c-check" />
                 <span class="site-name">Yaşar Teknik / Yansis</span>
               </label>
               <div class="site-status-row">
@@ -245,14 +245,14 @@
                   </svg>
                   <span>Bağlan</span>
                 </button>
-                <span class="status-indicator loading" id="site-c-status"
-                  >Kontrol Ediliyor...</span
+                <span class="status-indicator idle" id="site-c-status"
+                  >Devre Dışı</span
                 >
               </div>
             </div>
             <div class="site-item" data-site="SITE_D">
               <label class="site-checkbox-label">
-                <input type="checkbox" id="site-d-check" checked />
+                <input type="checkbox" id="site-d-check" />
                 <span class="site-name">Polisan Bayi</span>
               </label>
               <div class="site-status-row">
@@ -274,8 +274,8 @@
                   </svg>
                   <span>Bağlan</span>
                 </button>
-                <span class="status-indicator loading" id="site-d-status"
-                  >Kontrol Ediliyor...</span
+                <span class="status-indicator idle" id="site-d-status"
+                  >Devre Dışı</span
                 >
               </div>
             </div>
@@ -437,6 +437,37 @@
                   <span>Bağlan</span>
                 </button>
                 <span class="status-indicator loading" id="site-j-status"
+                  >Kontrol Ediliyor...</span
+                >
+              </div>
+            </div>
+            <div class="site-item" data-site="SITE_K">
+              <label class="site-checkbox-label">
+                <input type="checkbox" id="site-k-check" checked />
+                <span class="site-name" style="color: #ea580c"
+                  >Rico B2B</span
+                >
+              </label>
+              <div class="site-status-row">
+                <button
+                  class="connect-btn"
+                  data-site="SITE_K"
+                  title="Bağlan / Giriş Yap"
+                >
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                  >
+                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                    <line x1="12" y1="2" x2="12" y2="12"></line>
+                  </svg>
+                  <span>Bağlan</span>
+                </button>
+                <span class="status-indicator loading" id="site-k-status"
                   >Kontrol Ediliyor...</span
                 >
               </div>
@@ -1552,6 +1583,52 @@
                             />
                           </td>
                         </tr>
+                        <tr style="border-bottom: 1px solid var(--border)">
+                          <td
+                            style="
+                              padding: 10px;
+                              font-weight: 500;
+                              color: #ea580c;
+                            "
+                          >
+                            Rico B2B
+                          </td>
+                          <td style="padding: 10px; text-align: center">
+                            <input
+                              type="number"
+                              id="margin-site-k"
+                              style="
+                                width: 80px;
+                                padding: 6px;
+                                text-align: center;
+                                background: var(--bg-input);
+                                border: 1px solid var(--border);
+                                border-radius: 6px;
+                                color: var(--text);
+                              "
+                              min="0"
+                              value="40"
+                            />
+                          </td>
+                          <td style="padding: 10px; text-align: center">
+                            <input
+                              type="number"
+                              id="discount-site-k"
+                              style="
+                                width: 80px;
+                                padding: 6px;
+                                text-align: center;
+                                background: var(--bg-input);
+                                border: 1px solid var(--border);
+                                border-radius: 6px;
+                                color: var(--text);
+                              "
+                              min="0"
+                              max="100"
+                              value="35"
+                            />
+                          </td>
+                        </tr>
                       </tbody>
                     </table>
                   </div>
@@ -1987,6 +2064,10 @@
                 <label for="modal-url-site-j">Düz Metal Arama URL</label>
                 <input type="text" id="modal-url-site-j" value="" />
               </div>
+              <div class="input-wrapper">
+                <label for="modal-url-site-k">Rico B2B Arama URL</label>
+                <input type="text" id="modal-url-site-k" value="" />
+              </div>
               <div class="cart-action-buttons" style="margin-top: 15px">
                 <button id="modal-save-urls-btn" class="primary-btn flex-btn">
                   Kaydet
@@ -2298,6 +2379,46 @@
                   <input
                     type="password"
                     id="cred-pass-site-j"
+                    placeholder="Şifreniz..."
+                  />
+                </div>
+              </div>
+
+              <div
+                class="settings-group-title"
+                style="
+                  font-size: 12px;
+                  font-weight: 600;
+                  text-transform: uppercase;
+                  color: var(--text-muted);
+                  margin-bottom: 10px;
+                  margin-top: 15px;
+                "
+              >
+                Rico B2B
+              </div>
+              <div
+                class="settings-group"
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 8px;
+                  margin-bottom: 15px;
+                "
+              >
+                <div class="input-wrapper">
+                  <label for="cred-user-site-k">Kullanıcı Adı</label>
+                  <input
+                    type="text"
+                    id="cred-user-site-k"
+                    placeholder="Kullanıcı adınız (örn. AYG121)..."
+                  />
+                </div>
+                <div class="input-wrapper">
+                  <label for="cred-pass-site-k">Şifre</label>
+                  <input
+                    type="password"
+                    id="cred-pass-site-k"
                     placeholder="Şifreniz..."
                   />
                 </div>

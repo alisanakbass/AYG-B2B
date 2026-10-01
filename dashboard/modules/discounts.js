@@ -88,12 +88,16 @@ export function calculateTotalDiscountForProduct(name, productKey, sourceKey, ba
   }
 
   // 4. Siteye özel genel iskonto (Fallback)
-  const baseSiteDiscount = state.siteDiscounts ? (state.siteDiscounts[sourceKey] || 0) : 0;
-  if (baseSiteDiscount > 0) {
-    return {
-      discount: baseSiteDiscount,
-      type: 'Site Geneli'
-    };
+  // Not: SITE_K (Rico B2B) için tanımlanan iskonto, web sitesinde cariye tanımlanmadığından
+  // doğrudan alış maliyetine (basePrice) uygulanmıştır. Satış fiyatından ikinci kez düşülmemelidir.
+  if (sourceKey !== 'SITE_K') {
+    const baseSiteDiscount = state.siteDiscounts ? (state.siteDiscounts[sourceKey] || 0) : 0;
+    if (baseSiteDiscount > 0) {
+      return {
+        discount: baseSiteDiscount,
+        type: 'Site Geneli'
+      };
+    }
   }
 
   return {

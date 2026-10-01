@@ -94,6 +94,7 @@ async function loadSettings() {
       margin_site_h: 40,
       margin_site_i: 40,
       margin_site_j: 40,
+      margin_site_k: 40,
       discount_site_a: 0,
       discount_site_b: 0,
       discount_site_c: 0,
@@ -103,6 +104,17 @@ async function loadSettings() {
       discount_site_h: 0,
       discount_site_i: 0,
       discount_site_j: 0,
+      discount_site_k: 35,
+      'site-a-check': true,
+      'site-b-check': true,
+      'site-c-check': false,
+      'site-d-check': false,
+      'site-e-check': true,
+      'site-f-check': true,
+      'site-h-check': true,
+      'site-i-check': true,
+      'site-j-check': true,
+      'site-k-check': true,
       url_site_a: DEFAULT_URLS.url_site_a,
       url_site_b: DEFAULT_URLS.url_site_b,
       url_site_c: DEFAULT_URLS.url_site_c,
@@ -111,6 +123,7 @@ async function loadSettings() {
       url_site_h: DEFAULT_URLS.url_site_h,
       url_site_i: DEFAULT_URLS.url_site_i,
       url_site_j: DEFAULT_URLS.url_site_j,
+      url_site_k: DEFAULT_URLS.url_site_k,
       productDiscounts: {},
       keywordDiscounts: [],
       priceRangeDiscounts: [],
@@ -132,7 +145,9 @@ async function loadSettings() {
       cred_pass_site_i: "AYGUNLER01",
       cred_company_site_j: "MA301",
       cred_user_site_j: "AYGUNLER",
-      cred_pass_site_j: "MA301"
+      cred_pass_site_j: "MA301",
+      cred_user_site_k: "AYG121",
+      cred_pass_site_k: "25060"
     };
 
     const processSettings = (items) => {
@@ -146,6 +161,12 @@ async function loadSettings() {
       if (!items.url_site_j) {
         items.url_site_j = DEFAULT_URLS.url_site_j;
       }
+      if (!items.url_site_k) {
+        items.url_site_k = DEFAULT_URLS.url_site_k;
+      }
+      if (items.discount_site_k === undefined || items.discount_site_k === null || items.discount_site_k === 0) {
+        items.discount_site_k = 35;
+      }
 
       state.currentMargin = items.margin;
       state.siteMargins = {
@@ -157,7 +178,8 @@ async function loadSettings() {
         SITE_F: items.margin_site_f,
         SITE_H: items.margin_site_h,
         SITE_I: items.margin_site_i,
-        SITE_J: items.margin_site_j
+        SITE_J: items.margin_site_j,
+        SITE_K: items.margin_site_k
       };
       state.siteDiscounts = {
         SITE_A: items.discount_site_a,
@@ -168,7 +190,8 @@ async function loadSettings() {
         SITE_F: items.discount_site_f,
         SITE_H: items.discount_site_h,
         SITE_I: items.discount_site_i,
-        SITE_J: items.discount_site_j
+        SITE_J: items.discount_site_j,
+        SITE_K: items.discount_site_k
       };
       state.currentProductDiscounts = items.productDiscounts || {};
       state.keywordDiscounts = items.keywordDiscounts || [];
@@ -189,12 +212,17 @@ async function loadSettings() {
       const modalMargin = document.getElementById('modal-margin');
       if (modalMargin) modalMargin.value = items.margin;
 
-      ['a', 'b', 'c', 'd', 'e', 'f', 'h', 'i', 'j'].forEach(letter => {
+      ['a', 'b', 'c', 'd', 'e', 'f', 'h', 'i', 'j', 'k'].forEach(letter => {
         const key = `SITE_${letter.toUpperCase()}`;
         const mInput = document.getElementById(`margin-site-${letter}`);
         const dInput = document.getElementById(`discount-site-${letter}`);
         if (mInput) mInput.value = state.siteMargins[key];
         if (dInput) dInput.value = state.siteDiscounts[key];
+
+        const chk = document.getElementById(`site-${letter}-check`);
+        if (chk && items[`site-${letter}-check`] !== undefined) {
+          chk.checked = items[`site-${letter}-check`];
+        }
       });
 
       const modalUrlA = document.getElementById('modal-url-site-a');
@@ -205,6 +233,7 @@ async function loadSettings() {
       const modalUrlH = document.getElementById('modal-url-site-h');
       const modalUrlI = document.getElementById('modal-url-site-i');
       const modalUrlJ = document.getElementById('modal-url-site-j');
+      const modalUrlK = document.getElementById('modal-url-site-k');
       if (modalUrlA) modalUrlA.value = items.url_site_a;
       if (modalUrlB) modalUrlB.value = items.url_site_b;
       if (modalUrlC) modalUrlC.value = items.url_site_c;
@@ -213,6 +242,7 @@ async function loadSettings() {
       if (modalUrlH) modalUrlH.value = items.url_site_h;
       if (modalUrlI) modalUrlI.value = items.url_site_i;
       if (modalUrlJ) modalUrlJ.value = items.url_site_j;
+      if (modalUrlK) modalUrlK.value = items.url_site_k;
 
       // Giriş Bilgilerini Doldur
       const cUserA = document.getElementById('cred-user-site-a');
@@ -232,6 +262,8 @@ async function loadSettings() {
       const cCompJ = document.getElementById('cred-company-site-j');
       const cUserJ = document.getElementById('cred-user-site-j');
       const cPassJ = document.getElementById('cred-pass-site-j');
+      const cUserK = document.getElementById('cred-user-site-k');
+      const cPassK = document.getElementById('cred-pass-site-k');
 
       if (cUserA) cUserA.value = items.cred_user_site_a || "info@aygunleryapi.com";
       if (cPassA) cPassA.value = items.cred_pass_site_a || "FZ0DT1YL*0OE";
@@ -250,6 +282,8 @@ async function loadSettings() {
       if (cCompJ) cCompJ.value = items.cred_company_site_j || "MA301";
       if (cUserJ) cUserJ.value = items.cred_user_site_j || "AYGUNLER";
       if (cPassJ) cPassJ.value = items.cred_pass_site_j || "MA301";
+      if (cUserK) cUserK.value = items.cred_user_site_k || "AYG121";
+      if (cPassK) cPassK.value = items.cred_pass_site_k || "25060";
 
       renderKeywordDiscountRules();
       renderRangeDiscountRules();
@@ -317,6 +351,24 @@ function setupUIEventListeners() {
     if (e.key === 'Enter') executeSearch();
   });
 
+  // Site Checkbox Dinleyicileri (Seçim Durumunu Kaydet)
+  ['a', 'b', 'c', 'd', 'e', 'f', 'h', 'i', 'j', 'k'].forEach(letter => {
+    const chk = document.getElementById(`site-${letter}-check`);
+    if (chk) {
+      chk.addEventListener('change', async (e) => {
+        const checked = e.target.checked;
+        chrome.storage.sync.set({ [`site-${letter}-check`]: checked });
+        const key = `SITE_${letter.toUpperCase()}`;
+        const { updateStatusIndicator } = await import('./modules/search.js');
+        if (!checked) {
+          updateStatusIndicator(key, 'idle', 'Devre Dışı');
+        } else {
+          checkAllSessions();
+        }
+      });
+    }
+  });
+
   // Fiyat Hesaplama Anlık Güncelleme (Yedek)
   document.getElementById('modal-margin').addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
@@ -327,7 +379,7 @@ function setupUIEventListeners() {
   });
 
   // Site Bazlı Kâr Marjı ve Genel İskonto Dinleyicileri
-  ['a', 'b', 'c', 'd', 'e', 'f', 'h', 'i'].forEach(letter => {
+  ['a', 'b', 'c', 'd', 'e', 'f', 'h', 'i', 'j', 'k'].forEach(letter => {
     const key = `SITE_${letter.toUpperCase()}`;
     const mInput = document.getElementById(`margin-site-${letter}`);
     const dInput = document.getElementById(`discount-site-${letter}`);
@@ -338,6 +390,7 @@ function setupUIEventListeners() {
         if (!isNaN(val) && val >= 0) {
           state.siteMargins[key] = val;
           chrome.storage.sync.set({ [`margin_site_${letter}`]: val });
+          recalculateAllResults();
         }
       });
     }
@@ -348,6 +401,7 @@ function setupUIEventListeners() {
         if (!isNaN(val) && val >= 0 && val <= 100) {
           state.siteDiscounts[key] = val;
           chrome.storage.sync.set({ [`discount_site_${letter}`]: val });
+          recalculateAllResults();
         }
       });
     }
@@ -362,6 +416,8 @@ function setupUIEventListeners() {
     const urlE = document.getElementById('modal-url-site-e').value.trim();
     const urlH = document.getElementById('modal-url-site-h').value.trim();
     const urlI = document.getElementById('modal-url-site-i').value.trim();
+    const urlJ = document.getElementById('modal-url-site-j') ? document.getElementById('modal-url-site-j').value.trim() : DEFAULT_URLS.url_site_j;
+    const urlK = document.getElementById('modal-url-site-k') ? document.getElementById('modal-url-site-k').value.trim() : DEFAULT_URLS.url_site_k;
 
     chrome.storage.sync.set({
       url_site_a: urlA,
@@ -370,7 +426,9 @@ function setupUIEventListeners() {
       url_site_d: urlD,
       url_site_e: urlE,
       url_site_h: urlH,
-      url_site_i: urlI
+      url_site_i: urlI,
+      url_site_j: urlJ,
+      url_site_k: urlK
     }, () => {
       alert("URL şablonları başarıyla kaydedildi!");
       checkAllSessions();
@@ -1160,6 +1218,8 @@ function setupUIEventListeners() {
       const compJ = document.getElementById('cred-company-site-j') ? document.getElementById('cred-company-site-j').value.trim() : "MA301";
       const userJ = document.getElementById('cred-user-site-j') ? document.getElementById('cred-user-site-j').value.trim() : "AYGUNLER";
       const passJ = document.getElementById('cred-pass-site-j') ? document.getElementById('cred-pass-site-j').value.trim() : "MA301";
+      const userK = document.getElementById('cred-user-site-k') ? document.getElementById('cred-user-site-k').value.trim() : "AYG121";
+      const passK = document.getElementById('cred-pass-site-k') ? document.getElementById('cred-pass-site-k').value.trim() : "25060";
 
       chrome.storage.sync.set({
         cred_user_site_a: userA,
@@ -1178,7 +1238,9 @@ function setupUIEventListeners() {
         cred_pass_site_i: passI,
         cred_company_site_j: compJ,
         cred_user_site_j: userJ,
-        cred_pass_site_j: passJ
+        cred_pass_site_j: passJ,
+        cred_user_site_k: userK,
+        cred_pass_site_k: passK
       }, () => {
         alert("B2B giriş bilgileri başarıyla kaydedildi!");
       });
@@ -1317,7 +1379,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           state.currentCart = changes.cart.newValue || {};
           renderCart();
         }
-        if (changes.enderyapi_token || changes.session_SITE_A || changes.session_SITE_C) {
+        if (changes.enderyapi_token || changes.session_SITE_A || changes.session_SITE_C || changes.session_SITE_K || changes.session_SITE_J) {
           checkAllSessions();
         }
       }

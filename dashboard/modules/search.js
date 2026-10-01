@@ -100,6 +100,67 @@ export const PARSERS = {
     rowSelector: null,
     parseRow: null
   },
+  SITE_K: {
+    name: "Rico B2B",
+    badgeClass: "site_k",
+    rowSelector: '.search-table .tbody .tr, .tbody .tr, .tr[class*="kampanya-"]',
+    parseRow: (row, domain) => {
+      const tds = row.querySelectorAll('.td');
+      if (tds.length < 7) return null;
+
+      const code = tds[2]?.querySelector('.prbx2-text')?.textContent?.trim() || tds[2]?.textContent?.trim() || '';
+      const nameEl = tds[3]?.querySelector('.font-weight-bold') || tds[3]?.querySelector('.prbx2-text') || tds[3];
+      const name = nameEl?.textContent?.trim() || '';
+      if (!name) return null;
+
+      // tds[6]: Net Fiyat, tds[5]: Liste Fiyatı
+      const priceText = tds[6]?.textContent || tds[5]?.textContent || '';
+      let rawPrice = parsePrice(priceText);
+      if (isNaN(rawPrice) || rawPrice <= 0) return null;
+
+      let currency = 'TRY';
+      if (priceText.includes('$') || priceText.includes('USD')) {
+        currency = 'USD';
+      } else if (priceText.includes('€') || priceText.includes('EUR')) {
+        currency = 'EUR';
+      }
+
+      if (currency === 'USD') {
+        rawPrice = rawPrice * state.exchangeRates.USD;
+      } else if (currency === 'EUR') {
+        rawPrice = rawPrice * state.exchangeRates.EUR;
+      }
+
+      // Rico B2B carisi için iskonto sitede tanımlı olmadığından ayardaki iskonto (varsayılan %35) düşülerek net alış maliyeti hesaplanır
+      const discountRate = (state.siteDiscounts && state.siteDiscounts.SITE_K !== undefined) ? state.siteDiscounts.SITE_K : 35;
+      const basePrice = rawPrice * (1 - discountRate / 100);
+
+      const id = nameEl?.getAttribute('id') || '';
+      const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
+      const key = `b2b_${domain.replace(/\./g, '_')}_${id || code.replace(/[^\w]/g, '_') || cleanName}`;
+
+      let imgUrl = '';
+      const imgLink = row.querySelector('a.zoom');
+      const imgEl = row.querySelector('.prbx2-stok-resim img, img.lazy, img');
+      if (imgLink && imgLink.getAttribute('href')) {
+        imgUrl = imgLink.getAttribute('href');
+      } else if (imgEl) {
+        imgUrl = imgEl.getAttribute('data-src') || imgEl.getAttribute('src') || '';
+      }
+      if (imgUrl.includes('/0.png')) {
+        imgUrl = '';
+      } else if (imgUrl && !imgUrl.startsWith('http')) {
+        imgUrl = 'https://b2b.rico.com.tr' + (imgUrl.startsWith('/') ? '' : '/') + imgUrl;
+      }
+
+      const detailLink = row.querySelector('.list-dty-btn a, a[href*="/Stok/StokDetay/"]');
+      const productUrl = detailLink ? ('https://b2b.rico.com.tr' + detailLink.getAttribute('href')) : '';
+
+      let packQuantity = parsePackQuantityFromName(name);
+
+      return { key, name, itemCode: code, rawPrice, basePrice, domain, imgUrl, productUrl, unit: 'ADET', packQuantity: packQuantity || 1 };
+    }
+  },
   SITE_E: {
     name: "Akyüzler",
     badgeClass: "site_e",
@@ -338,7 +399,7 @@ export async function checkAllSessions() {
   try {
     if (typeof chrome !== 'undefined' && chrome?.storage?.local) {
       storageData = await new Promise(r =>
-        chrome.storage.local.get(['enderyapi_token', 'akyuz_token', 'duzmetal_token', 'session_SITE_A', 'session_SITE_C', 'session_SITE_D', 'session_SITE_E', 'session_SITE_H', 'session_SITE_I', 'session_SITE_J'], r)
+        chrome.storage.local.get(['enderyapi_token', 'akyuz_token', 'duzmetal_token', 'session_SITE_A', 'session_SITE_C', 'session_SITE_D', 'session_SITE_E', 'session_SITE_H', 'session_SITE_I', 'session_SITE_J', 'session_SITE_K'], r)
       ) || {};
     }
   } catch (err) {
@@ -355,15 +416,25 @@ export async function checkAllSessions() {
     storageData.enderyapi_token ? 'Aktif' : 'Pasif'
   );
 
-  updateStatusIndicator('SITE_C',
-    storageData.session_SITE_C ? 'success' : 'idle',
-    storageData.session_SITE_C ? 'Aktif' : 'Pasif'
-  );
+  const isSiteCChecked = document.getElementById('site-c-check')?.checked;
+  if (!isSiteCChecked) {
+    updateStatusIndicator('SITE_C', 'idle', 'Devre Dışı');
+  } else {
+    updateStatusIndicator('SITE_C',
+      storageData.session_SITE_C ? 'success' : 'idle',
+      storageData.session_SITE_C ? 'Aktif' : 'Pasif'
+    );
+  }
 
-  updateStatusIndicator('SITE_D',
-    storageData.session_SITE_D ? 'success' : 'idle',
-    storageData.session_SITE_D ? 'Aktif' : 'Pasif'
-  );
+  const isSiteDChecked = document.getElementById('site-d-check')?.checked;
+  if (!isSiteDChecked) {
+    updateStatusIndicator('SITE_D', 'idle', 'Devre Dışı');
+  } else {
+    updateStatusIndicator('SITE_D',
+      storageData.session_SITE_D ? 'success' : 'idle',
+      storageData.session_SITE_D ? 'Aktif' : 'Pasif'
+    );
+  }
 
   const isAkyuzActive = !!(storageData.akyuz_token || storageData.session_SITE_E);
   updateStatusIndicator('SITE_E',
@@ -385,6 +456,11 @@ export async function checkAllSessions() {
   updateStatusIndicator('SITE_J',
     isDuzmetalActive ? 'success' : 'idle',
     isDuzmetalActive ? 'Aktif' : 'Pasif'
+  );
+
+  updateStatusIndicator('SITE_K',
+    storageData.session_SITE_K ? 'success' : 'idle',
+    storageData.session_SITE_K ? 'Aktif' : 'Pasif'
   );
 }
 
@@ -488,6 +564,9 @@ export async function executeSearch() {
 
   if (document.getElementById('site-j-check') && document.getElementById('site-j-check').checked) activeSites.push('SITE_J');
   else updateStatusIndicator('SITE_J', 'idle', 'Devre Dışı');
+
+  if (document.getElementById('site-k-check') && document.getElementById('site-k-check').checked) activeSites.push('SITE_K');
+  else updateStatusIndicator('SITE_K', 'idle', 'Devre Dışı');
 
   if (activeSites.length === 0) {
     resultsContainer.innerHTML = `
@@ -1404,14 +1483,16 @@ export async function fetchFromB2B(siteKey, query, isRetry = false) {
     console.log(`[B2B Fetch Debug] Site: ${siteKey}, URL: ${searchUrl}`);
     console.log(`[B2B Fetch Debug] HTML Uzunluğu: ${htmlText.length} karakter`);
 
-    // Oturum Kapalı / Giriş Sayfası Tespiti (Tok Ticaret & Yaşar Teknik)
+    // Oturum Kapalı / Giriş Sayfası Tespiti (Tok Ticaret, Yaşar Teknik & Rico B2B)
     const isLoginPage = htmlText.includes('frmLogin') || 
                         htmlText.includes('Login.asp') || 
+                        htmlText.includes('LoginForm') ||
+                        htmlText.includes('Kullanici_Adi') ||
                         htmlText.includes('KullaniciAdiForm') || 
                         htmlText.includes('KullaniciKodu') ||
                         !!doc.querySelector('input[type="password"]');
 
-    if (isLoginPage && (siteKey === 'SITE_I' || siteKey === 'SITE_C') && !isRetry) {
+    if (isLoginPage && (siteKey === 'SITE_I' || siteKey === 'SITE_C' || siteKey === 'SITE_K') && !isRetry) {
       console.log(`[B2B Portal] ${siteKey} (${PARSERS[siteKey]?.name}) oturumu kapalı tespit edildi! Otomatik arka plan girişi yapılıyor...`);
       updateStatusIndicator(siteKey, 'loading', 'Giriş Yapılıyor...');
 
@@ -1652,10 +1733,15 @@ function setupResultsTableDelegation(container) {
 
     const profitWithVat = sellingWithVat - purchaseWithVat;
 
+    const siteDiscountRate = (product.sourceKey === 'SITE_K') ? ((state.siteDiscounts && state.siteDiscounts.SITE_K !== undefined) ? state.siteDiscounts.SITE_K : 35) : 0;
+
     const discBadgeHtml = discInfo.discount > 0 ?
       `<div class="discount-badge-value">%${discInfo.discount}</div>
        <div class="discount-badge-type">${escapeHtml(discInfo.type)}</div>` :
-      `<span style="color: var(--text-muted);">-</span>`;
+      (siteDiscountRate > 0 ?
+        `<div class="discount-badge-value" style="color: #ea580c;">%${siteDiscountRate}</div>
+         <div class="discount-badge-type" style="color: #c2410c;">Alış İsk.</div>` :
+        `<span style="color: var(--text-muted);">-</span>`);
 
     const unit = (product.unit || 'ADET').toUpperCase();
     const packQuantity = product.packQuantity || 1;
@@ -1670,11 +1756,11 @@ function setupResultsTableDelegation(container) {
     let purchasePricesHtml = `
       <div class="price-main">
         <span class="price-label" style="font-weight: 600;">Adet KDV'li Alış:</span>
-        <span style="font-weight: 700; color: var(--text);">${formatPrice(purchaseWithVat)}</span>
+        <span id="purchase-price-with-vat-${product.key}" style="font-weight: 700; color: var(--text);">${formatPrice(purchaseWithVat)}</span>
       </div>
       <div class="price-sub" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
         <span class="price-label">Adet KDV'siz Alış:</span>
-        <span>${formatPrice(purchaseNoVat)}</span>
+        <span id="purchase-price-no-vat-${product.key}">${formatPrice(purchaseNoVat)}</span>
       </div>
     `;
 
@@ -1715,8 +1801,11 @@ function setupResultsTableDelegation(container) {
       }
           </div>
           <div class="product-info-wrapper">
-            <div class="product-name-cell">${escapeHtml(product.name)}</div>
-            <span class="product-code">${product.domain}</span>
+            ${product.productUrl ?
+              `<a href="${product.productUrl}" target="_blank" style="text-decoration: none; color: inherit;"><div class="product-name-cell">${escapeHtml(product.name)}</div></a>` :
+              `<div class="product-name-cell">${escapeHtml(product.name)}</div>`
+            }
+            <span class="product-code">${product.itemCode ? `<span style="font-weight: 650; color: #1e293b;">${escapeHtml(product.itemCode)}</span> • ` : ''}${product.domain}</span>
             <div>${unitBadgeHtml}</div>
           </div>
         </div>
@@ -1763,6 +1852,12 @@ export function recalculateAllResults() {
   if (state.currentResults.length === 0) return;
 
   state.currentResults.forEach((product) => {
+    // Rico B2B gibi siteler için ayardaki iskonto değişimini ham fiyata yansıt
+    if (product.sourceKey === 'SITE_K' && product.rawPrice) {
+      const discountRate = (state.siteDiscounts && state.siteDiscounts.SITE_K !== undefined) ? state.siteDiscounts.SITE_K : 35;
+      product.basePrice = product.rawPrice * (1 - discountRate / 100);
+    }
+
     const discInfo = calculateTotalDiscountForProduct(product.name, product.key, product.sourceKey);
 
     const purchaseNoVat = product.basePrice;
@@ -1776,6 +1871,11 @@ export function recalculateAllResults() {
     const sellingWithVat = rawSellingWithVat * (1 - discInfo.discount / 100);
 
     const profitWithVat = sellingWithVat - purchaseWithVat;
+
+    const purchaseWithVatEl = document.getElementById(`purchase-price-with-vat-${product.key}`);
+    const purchaseNoVatEl = document.getElementById(`purchase-price-no-vat-${product.key}`);
+    if (purchaseWithVatEl) purchaseWithVatEl.textContent = formatPrice(purchaseWithVat);
+    if (purchaseNoVatEl) purchaseNoVatEl.textContent = formatPrice(purchaseNoVat);
 
     const sellPriceWithVatEl = document.getElementById(`sell-price-with-vat-${product.key}`);
     const sellPriceNoVatEl = document.getElementById(`sell-price-no-vat-${product.key}`);

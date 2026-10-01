@@ -2,8 +2,8 @@
 
 export const state = {
   currentMargin: 40,
-  siteMargins: { SITE_A: 40, SITE_B: 40, SITE_C: 40, SITE_D: 40, SITE_E: 40, SITE_F: 40, SITE_H: 40, SITE_I: 40, SITE_J: 40 },
-  siteDiscounts: { SITE_A: 0, SITE_B: 0, SITE_C: 0, SITE_D: 0, SITE_E: 0, SITE_F: 0, SITE_H: 0, SITE_I: 0, SITE_J: 0 },
+  siteMargins: { SITE_A: 40, SITE_B: 40, SITE_C: 40, SITE_D: 40, SITE_E: 40, SITE_F: 40, SITE_H: 40, SITE_I: 40, SITE_J: 40, SITE_K: 40 },
+  siteDiscounts: { SITE_A: 0, SITE_B: 0, SITE_C: 0, SITE_D: 0, SITE_E: 0, SITE_F: 0, SITE_H: 0, SITE_I: 0, SITE_J: 0, SITE_K: 35 },
   currentCart: {},
   drawerTimeout: null, // Sepet çekmecesi otomatik kapanma zamanlayıcısı
   currentResults: [], // Arama sonuçlarını hafızada tutar
@@ -36,7 +36,8 @@ export const DEFAULT_URLS = {
   url_site_e: "https://bayi.akyuztools.com/Search/SearchProduct",
   url_site_h: "https://b2b.kamilturk.com/Arama/_Prbx?q={query}",
   url_site_i: "https://bayi.tokticaret.com.tr/SiparisGir.asp?sayfa=&FAdi={query}&F=Ara&Sirala=varsayilan",
-  url_site_j: "https://b2b.duzmetal.com/urun/arama?kelime={query}"
+  url_site_j: "https://b2b.duzmetal.com/urun/arama?kelime={query}",
+  url_site_k: "https://b2b.rico.com.tr/Arama/_Prbx?q={query}"
 };
 
 // Fırat Boru Görsel Eşleştirme Listesi

@@ -1,5 +1,5 @@
 import { state, DEFAULT_URLS } from './modules/state.js';
-import { formatPrice, getSourceKeyFromDomain, calculateSellingPrice } from './modules/utils.js';
+import { formatPrice, getSourceKeyFromDomain, calculateSellingPrice, getEffectiveMargin } from './modules/utils.js';
 import { initDiscounts, calculateTotalDiscountForProduct, renderKeywordDiscountRules, renderRangeDiscountRules, renderProductDiscountRules, renderTieredMarginRules, reapplyAllDiscounts } from './modules/discounts.js';
 import { renderCart, renderReports, confirmCart, submitCart, salesHistoryPageIndex, setSalesHistoryPageIndex, salesFilters, transferCartToAygOrder, sendProductToAygOrder } from './modules/cart.js';
 import { loadFiratStats, loadDefaultExcelIfEmpty, setupExcelListeners, downloadBlankTeklifExcel } from './modules/excel.js';
@@ -543,15 +543,16 @@ function setupUIEventListeners() {
         if (item) {
           console.log(`[B2B Teklif] İşleniyor Satır ${i+1}:`, item.name);
           const sourceKey = item.sourceKey || getSourceKeyFromDomain(item.domain);
-          const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
-          const margin = state.siteMargins[sourceKey] !== undefined ? state.siteMargins[sourceKey] : state.currentMargin;
+          const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey, item.basePrice);
+          const margin = getEffectiveMargin(item.basePrice, sourceKey);
+          const itemVatRate = item.vatRate || 20;
           
           const vatToggle = document.getElementById('offer-preview-vat-toggle');
           const includeVat = vatToggle ? vatToggle.checked : true;
           
           const rawUnitPriceNoVat = includeVat 
-            ? calculateSellingPrice(item.basePrice, margin, true) 
-            : calculateSellingPrice(item.basePrice, 0, false);
+            ? calculateSellingPrice(item.basePrice, margin, true, itemVatRate) 
+            : calculateSellingPrice(item.basePrice, 0, false, itemVatRate);
           const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
           
           const itemUnit = (item.unit || 'ADET').toUpperCase();
@@ -722,13 +723,14 @@ function setupUIEventListeners() {
       tbody.innerHTML = '';
       sale.items.forEach(item => {
         const sourceKey = item.sourceKey || getSourceKeyFromDomain(item.domain);
-        const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
-        const margin = state.siteMargins[sourceKey] !== undefined ? state.siteMargins[sourceKey] : state.currentMargin;
+        const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey, item.basePrice);
+        const margin = getEffectiveMargin(item.basePrice, sourceKey);
+        const itemVatRate = item.vatRate || 20;
         
-        const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false);
+        const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false, itemVatRate);
         const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
         
-        const rawUnitPriceWithVat = calculateSellingPrice(item.basePrice, margin, true);
+        const rawUnitPriceWithVat = calculateSellingPrice(item.basePrice, margin, true, itemVatRate);
         const unitPriceWithVat = rawUnitPriceWithVat * (1 - discInfo.discount / 100);
 
         const itemUnit = (item.unit || 'ADET').toUpperCase();
@@ -1271,9 +1273,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // İskonto işlemlerine, arama sonuçlarını yeniden tetikleyen callback'i bağla
   initDiscounts(renderResults);
 
-  // Sürüm güncelleme kontrolünü çalıştır
-  checkUpdates();
-
   // Döviz kurlarını güncel olarak çek
   await fetchExchangeRates();
 
@@ -1347,26 +1346,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 200);
   });
 
-  // Görsel yükleme hatalarını CSP uyumlu yakalayıp yer tutucu (placeholder) gösterme
-  const resultsTable = document.getElementById('comparison-results');
-  if (resultsTable) {
-    resultsTable.addEventListener('error', (e) => {
-      if (e.target && e.target.tagName === 'IMG' && e.target.classList.contains('product-img')) {
-        e.target.style.display = 'none';
-        const placeholder = e.target.nextElementSibling;
-        if (placeholder) {
-          placeholder.style.display = 'block';
-        }
-      }
-    }, true);
-  }
-
   // Storage değişikliklerini izle
   if (typeof chrome !== 'undefined' && chrome?.storage?.onChanged) {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'sync') {
         const keys = Object.keys(changes);
-        const isPricingChange = keys.some(k => k.startsWith('margin_site_') || k.startsWith('discount_site_') || k === 'margin' || k === 'keywordDiscounts' || k === 'productDiscounts');
+        const isPricingChange = keys.some(k =>
+          k.startsWith('margin_site_') ||
+          k.startsWith('discount_site_') ||
+          k === 'margin' ||
+          k === 'keywordDiscounts' ||
+          k === 'productDiscounts' ||
+          k === 'priceRangeDiscounts' ||
+          k === 'tieredMargins' ||
+          k === 'marginMode'
+        );
         if (isPricingChange) {
           loadSettings().then(() => {
             recalculateAllResults();
@@ -1389,6 +1383,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Otomatik Güncelleme Kontrolü ve Native Host Tetikleme
   const updateBanner = document.getElementById('update-notification');
   const btnNativeUpdate = document.getElementById('btn-do-native-update');
+  const btnCloseUpdateBanner = document.getElementById('btn-close-update-banner');
+
+  if (btnCloseUpdateBanner && updateBanner) {
+    btnCloseUpdateBanner.addEventListener('click', () => {
+      updateBanner.style.display = 'none';
+    });
+  }
+
+  const btnTransferCartToAyg = document.getElementById('btn-transfer-cart-to-ayg');
+  if (btnTransferCartToAyg) {
+    btnTransferCartToAyg.addEventListener('click', () => {
+      if (typeof window.transferCartToAygOrder === 'function') {
+        window.transferCartToAygOrder();
+      }
+    });
+  }
 
   if (typeof chrome !== 'undefined' && chrome?.runtime?.sendMessage) {
     chrome.runtime.sendMessage({ action: 'check_github_version' }, (res) => {
@@ -1485,38 +1495,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Şantiye modülünü ve Groq ayarlarını başlat
   initSantiyeModule();
   syncGroqSettingsToUI();
-
-  // Eklenti açıldığında Tok Ticaret ve Yaşar Teknik oturumlarını arka planda sessizce hazırla
-  setTimeout(() => {
-    chrome.storage.local.get(['session_SITE_I', 'session_SITE_C'], (res) => {
-      if (!res.session_SITE_I) {
-        chrome.runtime.sendMessage({ action: "manual_login", siteKey: "SITE_I" }, () => {
-          checkAllSessions();
-        });
-      }
-      if (!res.session_SITE_C) {
-        chrome.runtime.sendMessage({ action: "manual_login", siteKey: "SITE_C" }, () => {
-          checkAllSessions();
-        });
-      }
-    });
-  }, 400);
 });
 
 // Görsel yüklenemediğinde çalışan merkezi hata yakalayıcı (CSP Uyumlu & Optimize Edilmiş)
 document.addEventListener('error', (e) => {
-  if (e.target && e.target.tagName === 'IMG' && e.target.classList.contains('product-img')) {
+  if (e.target && e.target.tagName === 'IMG') {
     const img = e.target;
     if (img.dataset.failed) return;
     img.dataset.failed = 'true';
 
-    img.style.display = 'none';
-    const placeholder = img.nextElementSibling;
-    if (placeholder && placeholder.classList.contains('product-img-placeholder')) {
-      placeholder.style.display = 'block';
+    if (img.classList.contains('product-img')) {
+      img.style.display = 'none';
+      const placeholder = img.nextElementSibling;
+      if (placeholder && placeholder.classList.contains('product-img-placeholder')) {
+        placeholder.style.display = 'block';
+      } else {
+        img.src = '../logo.png';
+        img.style.display = 'block';
+      }
     } else {
       img.src = '../logo.png';
-      img.style.display = 'block';
     }
   }
 }, true);

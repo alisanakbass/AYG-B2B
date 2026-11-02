@@ -1,397 +1,13 @@
 import { state, DEFAULT_URLS } from './state.js';
-import { parsePrice, formatPrice, parsePackQuantityFromName, calculateSellingPrice, getEffectiveMargin, extractImageUrl, getSourceKeyFromDomain, escapeHtml } from './utils.js';
+import { parsePrice, formatPrice, parsePackQuantityFromName, calculateSellingPrice, getEffectiveMargin, extractImageUrl, getSourceKeyFromDomain, escapeHtml, extractVatRate } from './utils.js';
 import { calculateTotalDiscountForProduct } from './discounts.js';
 import { addToSharedCart } from './cart.js';
+import { SITE_ADAPTERS, PARSERS } from './sites/index.js';
+import { updateStatusIndicator, updateSessionActive } from './sites/base.js';
+
+export { SITE_ADAPTERS, PARSERS, updateStatusIndicator, updateSessionActive };
 
 let imageFetchQueue = [];
-
-// --- DYNAMIC SELECTORS ---
-export const PARSERS = {
-  SITE_F: {
-    name: "Fırat Boru",
-    badgeClass: "site_f",
-    rowSelector: null,
-    parseRow: null
-  },
-  SITE_H: {
-    name: "Kamil Türk B2B",
-    badgeClass: "site_h",
-    rowSelector: '.prbx-item',
-    parseRow: (row, domain) => {
-      const nameEl = row.querySelector('.prbx-ad');
-      if (!nameEl) return null;
-      const name = nameEl.textContent.trim();
-
-      const priceBox = Array.from(row.querySelectorAll('.fiyat-box-item')).find(el => el.textContent.includes('Net Fiyat'));
-      if (!priceBox) return null;
-      
-      const spans = priceBox.querySelectorAll('span');
-      if (spans.length < 3) return null;
-      const basePrice = parsePrice(spans[2].textContent);
-
-      const codeId = nameEl.getAttribute('id') || '';
-      const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
-      const key = `b2b_${domain.replace(/\./g, '_')}_${codeId || cleanName}`;
-
-      let imgUrl = '';
-      const imgEl = row.querySelector('.prbx-image img');
-      if (imgEl) {
-        imgUrl = imgEl.getAttribute('data-src') || imgEl.getAttribute('src') || '';
-      }
-      if (imgUrl && !imgUrl.startsWith('http')) {
-        imgUrl = 'https://b2b.kamilturk.com' + (imgUrl.startsWith('/') ? '' : '/') + imgUrl;
-      }
-
-      return { key, name, basePrice, domain, imgUrl, unit: 'ADET', packQuantity: 1 };
-    }
-  },
-  SITE_I: {
-    name: "Tok Ticaret",
-    badgeClass: "site_i",
-    rowSelector: 'tr[id]',
-    parseRow: (row, domain) => {
-      const tds = row.querySelectorAll('td');
-      if (tds.length < 7) return null;
-
-      const code = tds[1]?.textContent?.trim() || '';
-      const name = tds[2]?.textContent?.trim() || 'Bilinmeyen Ürün';
-      if (!name || name === 'Bilinmeyen Ürün') return null;
-
-      // İnd. Fiyat/Ad. sütunu (tds[6]) net alış fiyatıdır
-      const priceText = tds[6]?.textContent || '';
-      let basePrice = parsePrice(priceText);
-      if (isNaN(basePrice) || basePrice <= 0) return null;
-
-      let currency = 'TRY';
-      if (priceText.includes('$') || priceText.includes('USD') || priceText.includes('USDB')) {
-        currency = 'USD';
-      } else if (priceText.includes('€') || priceText.includes('EUR') || priceText.includes('EURO') || priceText.includes('EUROB')) {
-        currency = 'EUR';
-      }
-
-      if (currency === 'USD') {
-        basePrice = basePrice * state.exchangeRates.USD;
-      } else if (currency === 'EUR') {
-        basePrice = basePrice * state.exchangeRates.EUR;
-      }
-
-      const codeId = row.id || code.replace(/[^\w]/g, '_') || '';
-      const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
-      const key = `b2b_${domain.replace(/\./g, '_')}_${codeId || cleanName}`;
-
-      let imgUrl = '';
-      const imgEl = row.querySelector('td a.lightbox-item img, td img.urun-kucuk-resim, img');
-      if (imgEl) {
-        imgUrl = imgEl.getAttribute('data-src') || imgEl.getAttribute('src') || '';
-      }
-
-      const unitEl = row.querySelector('#basic-addon1') || tds[9]?.querySelector('.input-group-text');
-      let unit = unitEl ? unitEl.textContent.trim().toUpperCase() : 'ADET';
-      if (!unit) unit = 'ADET';
-
-      let packQuantity = parsePackQuantityFromName(name);
-
-      return { key, name, basePrice, domain, imgUrl, unit, packQuantity: packQuantity || 1 };
-    }
-  },
-  SITE_J: {
-    name: "Düz Metal",
-    badgeClass: "site_j",
-    rowSelector: null,
-    parseRow: null
-  },
-  SITE_K: {
-    name: "Rico B2B",
-    badgeClass: "site_k",
-    rowSelector: '.search-table .tbody .tr, .tbody .tr, .tr[class*="kampanya-"]',
-    parseRow: (row, domain) => {
-      const tds = row.querySelectorAll('.td');
-      if (tds.length < 7) return null;
-
-      const code = tds[2]?.querySelector('.prbx2-text')?.textContent?.trim() || tds[2]?.textContent?.trim() || '';
-      const nameEl = tds[3]?.querySelector('.font-weight-bold') || tds[3]?.querySelector('.prbx2-text') || tds[3];
-      const name = nameEl?.textContent?.trim() || '';
-      if (!name) return null;
-
-      // tds[6]: Net Fiyat, tds[5]: Liste Fiyatı
-      const priceText = tds[6]?.textContent || tds[5]?.textContent || '';
-      let rawPrice = parsePrice(priceText);
-      if (isNaN(rawPrice) || rawPrice <= 0) return null;
-
-      let currency = 'TRY';
-      if (priceText.includes('$') || priceText.includes('USD')) {
-        currency = 'USD';
-      } else if (priceText.includes('€') || priceText.includes('EUR')) {
-        currency = 'EUR';
-      }
-
-      if (currency === 'USD') {
-        rawPrice = rawPrice * state.exchangeRates.USD;
-      } else if (currency === 'EUR') {
-        rawPrice = rawPrice * state.exchangeRates.EUR;
-      }
-
-      // Rico B2B carisi için iskonto sitede tanımlı olmadığından ayardaki iskonto (varsayılan %35) düşülerek net alış maliyeti hesaplanır
-      const discountRate = (state.siteDiscounts && state.siteDiscounts.SITE_K !== undefined) ? state.siteDiscounts.SITE_K : 35;
-      const basePrice = rawPrice * (1 - discountRate / 100);
-
-      const id = nameEl?.getAttribute('id') || '';
-      const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
-      const key = `b2b_${domain.replace(/\./g, '_')}_${id || code.replace(/[^\w]/g, '_') || cleanName}`;
-
-      let imgUrl = '';
-      const imgLink = row.querySelector('a.zoom');
-      const imgEl = row.querySelector('.prbx2-stok-resim img, img.lazy, img');
-      if (imgLink && imgLink.getAttribute('href')) {
-        imgUrl = imgLink.getAttribute('href');
-      } else if (imgEl) {
-        imgUrl = imgEl.getAttribute('data-src') || imgEl.getAttribute('src') || '';
-      }
-      if (imgUrl.includes('/0.png')) {
-        imgUrl = '';
-      } else if (imgUrl && !imgUrl.startsWith('http')) {
-        imgUrl = 'https://b2b.rico.com.tr' + (imgUrl.startsWith('/') ? '' : '/') + imgUrl;
-      }
-
-      const detailLink = row.querySelector('.list-dty-btn a, a[href*="/Stok/StokDetay/"]');
-      const productUrl = detailLink ? ('https://b2b.rico.com.tr' + detailLink.getAttribute('href')) : '';
-
-      let packQuantity = parsePackQuantityFromName(name);
-
-      return { key, name, itemCode: code, rawPrice, basePrice, domain, imgUrl, productUrl, unit: 'ADET', packQuantity: packQuantity || 1 };
-    }
-  },
-  SITE_E: {
-    name: "Akyüzler",
-    badgeClass: "site_e",
-    rowSelector: null,
-    parseRow: null
-  },
-  SITE_A: {
-    name: "Özkaradeniz İnşaat",
-    badgeClass: "site_a",
-    rowSelector: 'tr[ng-repeat*="product_list"]',
-    parseRow: (row, domain) => {
-      let name = 'Bilinmeyen Ürün';
-      const tds = row.querySelectorAll('td');
-      for (const td of tds) {
-        if (td.classList.contains('actions') || td.querySelector('input')) continue;
-        const clone = td.cloneNode(true);
-        const uls = clone.querySelectorAll('ul');
-        uls.forEach(ul => ul.remove());
-        const txt = clone.textContent.trim();
-        if (txt) {
-          name = txt.replace(/\s+/g, ' ');
-          break;
-        }
-      }
-
-      let basePrice = NaN;
-      const uls = row.querySelectorAll('td ul');
-      for (const ul of uls) {
-        const lis = ul.querySelectorAll('li');
-        for (const li of lis) {
-          if (li.textContent.includes('KDV Hariç')) {
-            const span = li.querySelector('span');
-            const priceText = span ? span.textContent : li.textContent.replace('KDV Hariç:', '');
-            basePrice = parsePrice(priceText);
-
-            let currency = 'TRY';
-            if (priceText.includes('$') || priceText.includes('USD') || priceText.includes('fa-usd') || priceText.includes('fa-dollar')) {
-              currency = 'USD';
-            } else if (priceText.includes('€') || priceText.includes('EUR') || priceText.includes('fa-eur') || priceText.includes('fa-euro')) {
-              currency = 'EUR';
-            }
-
-            if (currency === 'USD') {
-              basePrice = basePrice * state.exchangeRates.USD;
-            } else if (currency === 'EUR') {
-              basePrice = basePrice * state.exchangeRates.EUR;
-            }
-            break;
-          }
-        }
-      }
-
-      const inputEl = row.querySelector('input[type="number"]');
-      let modelId = '';
-      if (inputEl) {
-        const modelAttr = inputEl.getAttribute('ng-model') || '';
-        const match = modelAttr.match(/\[([^\]]+)\]/);
-        modelId = match ? match[1].replace(/[^\w]/g, '_') : modelAttr.replace(/[^\w]/g, '_');
-      }
-      const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
-      const key = `b2b_${domain.replace(/\./g, '_')}_${modelId || cleanName}`;
-
-      const imgUrl = extractImageUrl(row, 'img', domain);
-
-      return { key, name, basePrice, domain, imgUrl, unit: 'ADET', packQuantity: 1 };
-    }
-  },
-  SITE_B: {
-    name: "Ender Yapı",
-    badgeClass: "site_b",
-    rowSelector: 'a.row-id, a[id^="ProductID_"]',
-    parseRow: (row, domain) => {
-      const nameEl = row.querySelector('.name-id-link, [data-title="Ürün"] .name-id-link');
-      const name = nameEl ? nameEl.textContent.trim() : 'Bilinmeyen Ürün';
-
-      const priceEl = row.querySelector('[data-title="KDV’siz Net Fiyat"], .price-id');
-      let basePrice = NaN;
-      if (priceEl) {
-        const clone = priceEl.cloneNode(true);
-        const priceText = priceEl.innerHTML;
-
-        let currency = 'TRY';
-        if (priceText.includes('fa-usd') || priceText.includes('fa-dollar') || priceText.includes('$') || priceText.includes('USD')) {
-          currency = 'USD';
-        } else if (priceText.includes('fa-eur') || priceText.includes('fa-euro') || priceText.includes('€') || priceText.includes('EUR')) {
-          currency = 'EUR';
-        }
-
-        const iTag = clone.querySelector('i');
-        if (iTag) iTag.remove();
-        basePrice = parsePrice(clone.textContent);
-
-        if (currency === 'USD') {
-          basePrice = basePrice * state.exchangeRates.USD;
-        } else if (currency === 'EUR') {
-          basePrice = basePrice * state.exchangeRates.EUR;
-        }
-      }
-
-      const codeEl = row.querySelector('.code-id span');
-      const codeId = codeEl ? codeEl.textContent.trim().replace(/\s+/g, '_') : '';
-      const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
-      const key = `b2b_${domain.replace(/\./g, '_')}_${codeId || cleanName}`;
-
-      const imgUrl = extractImageUrl(row, '.img-id img, img', domain);
-
-      const unitEl = row.querySelector('.unit-id, .measure-unit, [data-title="Birim"], [data-title="Birim"] span');
-      let unit = unitEl ? unitEl.textContent.trim().toUpperCase() : 'ADET';
-      if (unit.includes('PAKET') || unit.includes('KOLİ') || unit.includes('KUTU') || unit.includes('DZ') || unit.includes('DÜZİNE') || unit.includes('SET') || unit.includes('TAKIM')) {
-        unit = (unit.includes('DZ') || unit.includes('DÜZİNE')) ? 'DÜZİNE' :
-          (unit.includes('KOLİ') ? 'KOLİ' :
-            (unit.includes('KUTU') ? 'KUTU' : 'PAKET'));
-      } else {
-        unit = 'ADET';
-      }
-
-      let packQuantity = parsePackQuantityFromName(name);
-
-      if (!packQuantity) {
-        const boxQtyEl = row.querySelector('[data-title="Kutu / Koli"], [data-title="Kutu / Koli"] span, .fieldone-id, .fieldone-id span, .multiplier-id, .order-multiplier, [data-title="Çarpan"]');
-        packQuantity = 1;
-        if (boxQtyEl) {
-          const text = boxQtyEl.textContent.trim();
-          const match = text.match(/(\d+)/);
-          if (match) {
-            const parsed = parseInt(match[1], 10);
-            if (!isNaN(parsed) && parsed > 0) packQuantity = parsed;
-          }
-        }
-      }
-
-      return { key, name, basePrice, domain, imgUrl, unit, packQuantity };
-    }
-  },
-  SITE_C: {
-    name: "Yaşar Teknik",
-    badgeClass: "site_c",
-    rowSelector: 'tr[id]',
-    parseRow: (row, domain) => {
-      if (!row.querySelector('.btnSepeteEkle') && !row.querySelector('td[onclick*="UrunModalGoster"]')) return null;
-
-      const nameEl = row.querySelector('td[onclick*="UrunModalGoster"]');
-      const name = nameEl ? nameEl.textContent.trim() : 'Bilinmeyen Ürün';
-
-      const tds = row.querySelectorAll('td');
-      let basePrice = NaN;
-      if (tds.length >= 5) {
-        const priceText = tds[4].textContent;
-        basePrice = parsePrice(priceText);
-
-        let currency = 'TRY';
-        if (priceText.includes('$') || priceText.includes('USD') || priceText.includes('fa-usd') || priceText.includes('fa-dollar')) {
-          currency = 'USD';
-        } else if (priceText.includes('€') || priceText.includes('EUR') || priceText.includes('fa-eur') || priceText.includes('fa-euro')) {
-          currency = 'EUR';
-        }
-
-        if (currency === 'USD') {
-          basePrice = basePrice * state.exchangeRates.USD;
-        } else if (currency === 'EUR') {
-          basePrice = basePrice * state.exchangeRates.EUR;
-        }
-      }
-
-      const codeId = row.id || '';
-      const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
-      const key = `b2b_${domain.replace(/\./g, '_')}_${codeId || cleanName}`;
-
-      const imgUrl = extractImageUrl(row, 'td img, img', domain);
-
-      return { key, name, basePrice, domain, imgUrl, unit: 'ADET', packQuantity: 1 };
-    }
-  },
-  SITE_D: {
-    name: "Polisan Bayi",
-    badgeClass: "site_d",
-    rowSelector: 'div.col-md-3.col-sm-4',
-    parseRow: (row, domain) => {
-      if (!row.querySelector('h4[data-bind="text:sku"]') && !row.querySelector('h4[data-bind="text:name"]')) return null;
-
-      const nameEl = row.querySelector('h4[data-bind="text:name"]');
-      const name = nameEl ? nameEl.textContent.trim() : 'Bilinmeyen Ürün';
-
-      const codeEl = row.querySelector('h4[data-bind="text:sku"]');
-      const codeId = codeEl ? codeEl.textContent.trim() : '';
-
-      const priceEl = row.querySelector('span[data-bind="text:price"]');
-      let basePrice = NaN;
-      if (priceEl) {
-        const priceText = priceEl.textContent;
-        basePrice = parsePrice(priceText);
-
-        let currency = 'TRY';
-        if (priceText.includes('$') || priceText.includes('USD') || priceText.includes('fa-usd') || priceText.includes('fa-dollar')) {
-          currency = 'USD';
-        } else if (priceText.includes('€') || priceText.includes('EUR') || priceText.includes('fa-eur') || priceText.includes('fa-euro')) {
-          currency = 'EUR';
-        }
-
-        if (currency === 'USD') {
-          basePrice = basePrice * state.exchangeRates.USD;
-        } else if (currency === 'EUR') {
-          basePrice = basePrice * state.exchangeRates.EUR;
-        }
-      }
-
-      const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
-      const key = `b2b_${domain.replace(/\./g, '_')}_${codeId || cleanName}`;
-
-      const imgUrl = extractImageUrl(row, 'img[data-bind*="pictureUrl"], img', domain);
-
-      const unitEl = row.querySelector('[data-bind*="unit"], [data-bind*="unitName"]');
-      let unit = unitEl ? unitEl.textContent.trim().toUpperCase() : 'ADET';
-
-      let packQuantity = parsePackQuantityFromName(name);
-
-      if (!packQuantity) {
-        const boxQtyEl = row.querySelector('[data-bind*="boxQty"], [data-bind*="boxQuantity"], [data-bind*="multiplier"]');
-        packQuantity = 1;
-        if (boxQtyEl) {
-          const parsedQty = parseInt(boxQtyEl.textContent.trim(), 10);
-          if (!isNaN(parsedQty) && parsedQty > 0) {
-            packQuantity = parsedQty;
-          }
-        }
-      }
-
-      return { key, name, basePrice, domain, imgUrl, unit, packQuantity };
-    }
-  }
-};
 
 // --- SESSION CHECKERS (Oturum Durum Kontrolleri) ---
 export async function checkAllSessions() {
@@ -499,21 +115,6 @@ export function compareVersions(v1, v2) {
   return 0;
 }
 
-// Status Güncelleme
-export function updateStatusIndicator(siteKey, stateName, text) {
-  const letter = siteKey.replace('SITE_', '').toLowerCase();
-  const el = document.getElementById(`site-${letter}-status`);
-  if (el) {
-    el.className = `status-indicator ${stateName}`;
-    el.textContent = text;
-  }
-}
-
-// Arama başarılı olduğunda site durumunu Aktif olarak kaydet
-export function updateSessionActive(siteKey) {
-  chrome.storage.local.set({ [`session_${siteKey}`]: true });
-}
-
 // --- ARAMA MOTORU MEKANİZMASI ---
 export async function executeSearch() {
   const query = document.getElementById('search-input').value.trim();
@@ -593,955 +194,14 @@ export async function executeSearch() {
   });
 }
 
-// Tek Bir B2B Sitesinden Veri Çekme
+// Tek Bir B2B Sitesinden Veri Çekme (Site Adapter Mimarisi)
 export async function fetchFromB2B(siteKey, query, isRetry = false) {
-  updateStatusIndicator(siteKey, 'loading', isRetry ? 'Yeniden Deneniyor...' : 'Aranıyor...');
-
-  if (siteKey === 'SITE_F') {
-    const { fetchFromLocalFirat } = await import('./excel.js');
-    return fetchFromLocalFirat(query);
-  }
-
-  const storageKey = `url_${siteKey.toLowerCase()}`;
-  const settings = await new Promise(r => chrome.storage.sync.get(storageKey, r));
-  const urlTemplate = settings[storageKey] || DEFAULT_URLS[storageKey];
-
-  let encodedQuery = encodeURIComponent(query);
-
-  const searchUrl = urlTemplate.replace('{query}', encodedQuery);
-  const domain = new URL(searchUrl).hostname;
-
-  // --- ÖZKARADENİZ İNŞAAT (SITE_A) API SORGU YÖNTEMİ ---
-  if (siteKey === 'SITE_A') {
-    const origin = new URL(searchUrl).origin;
-    const apiUrl = `${origin}/search/get_product_list`;
-
-    try {
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept': 'application/json, text/plain, */*'
-        },
-        body: `type=product&parameter=${encodeURIComponent(query)}&search=&query_string=`
-      });
-
-      if (!response.ok) throw new Error(`HTTP Hata: ${response.status}`);
-
-      const responseText = await response.text();
-
-      let data = {};
-      try {
-        data = JSON.parse(responseText);
-      } catch (e) {
-        throw new Error("API yanıtı JSON formatında değil.");
-      }
-
-      const list = (data.data && data.data.list) || data.list || [];
-
-      const config = PARSERS[siteKey];
-      let itemsFoundCount = 0;
-
-      list.forEach(jsonRow => {
-        try {
-          const name = jsonRow.c || 'Bilinmeyen Ürün';
-          const code = jsonRow.b || jsonRow.b0 || '';
-
-          let basePrice = NaN;
-          if (jsonRow.j) {
-            basePrice = parsePrice(jsonRow.j.toString());
-          } else if (jsonRow.a1 && jsonRow.a1.TL && jsonRow.a1.TL.net_price_raw) {
-            basePrice = jsonRow.a1.TL.net_price_raw;
-          } else if (jsonRow.g) {
-            basePrice = parsePrice(jsonRow.g.toString());
-          }
-
-          const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
-          const key = `b2b_${domain.replace(/\./g, '_')}_${jsonRow.a || cleanName}`;
-
-          let imgUrl = '';
-          if (jsonRow.o && jsonRow.o.length > 0) {
-            const val = jsonRow.o[0];
-            const imgPath = val.a || '';
-            const imgType = val.b;
-
-            let baseUrl = 'https://d1y8qveuwztoxr.cloudfront.net/b2b_ozkaradeniz/';
-            if (imgType == 3) {
-              baseUrl = 'https://b4b.ozkaradenizinsaat.com/upload/ext_image/';
-            } else if (imgType == 2) {
-              baseUrl = 'https://d1y8qveuwztoxr.cloudfront.net/_NAT/';
-            }
-
-            imgUrl = `${baseUrl}${imgPath}`;
-          }
-
-          if (!isNaN(basePrice) && basePrice > 0) {
-            const parsedPackQty = parsePackQuantityFromName(name);
-            state.currentResults.push({
-              key,
-              name,
-              basePrice: basePrice,
-              domain,
-              imgUrl,
-              sourceKey: siteKey,
-              sourceName: config.name,
-              badgeClass: config.badgeClass,
-              unit: parsedPackQty ? 'PAKET' : 'ADET',
-              packQuantity: parsedPackQty || 1
-            });
-            itemsFoundCount++;
-          }
-        } catch (err) {
-          console.error(`Özkaradeniz satır çözme hatası:`, err);
-        }
-      });
-
-      updateStatusIndicator(siteKey, 'success', `${itemsFoundCount} Ürün`);
-      if (itemsFoundCount > 0) updateSessionActive(siteKey);
-    } catch (error) {
-      console.error(`Özkaradeniz veri çekme hatası:`, error);
-      if (error.message && error.message.includes('401')) {
-        updateStatusIndicator(siteKey, 'error', 'Pasif');
-      } else {
-        updateStatusIndicator(siteKey, 'error', 'Hata Oluştu');
-      }
-    }
+  const adapter = SITE_ADAPTERS[siteKey];
+  if (!adapter || !adapter.search) {
+    console.warn(`[B2B Portal] ${siteKey} için adapter bulunamadı.`);
     return;
   }
-
-  // --- ENDER YAPI (SITE_B) API SORGU YÖNTEMİ ---
-  if (siteKey === 'SITE_B') {
-    const storageData = await new Promise(r => chrome.storage.local.get('enderyapi_token', r));
-    const token = storageData.enderyapi_token;
-
-    if (!token) {
-      updateStatusIndicator(siteKey, 'error', 'Giriş Gerekli');
-      return;
-    }
-
-    const apiUrl = `https://b2bstore.com.tr:14500/services/product/get-product-search`;
-
-    try {
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json, text/plain, */*',
-          'Authorization': `Bearer ${token}`,
-          'Browser-Web-Url': 'b2b.enderyapi.com.tr',
-          'Languagecode': 'TR'
-        },
-        body: JSON.stringify({
-          ConsumerPrice: false,
-          DiscountSale: 0,
-          MostSaled: 0,
-          MostViewed: 0,
-          NewProduct: 0,
-          Pg: 1,
-          ProductOfTheDay: 0,
-          ProductOfTheWeek: 0,
-          RunFlat: 0,
-          Stock: 0,
-          filterModel: { Filter: [], CategoryID: null, BrandID: null, SeasonID: null },
-          keyword: query
-        })
-      });
-
-      if (response.status === 401) {
-        throw new Error("Yetkisendirme Hatası (Oturum Kapatılmış)");
-      }
-      if (!response.ok) throw new Error(`HTTP Hata: ${response.status}`);
-
-      const responseText = await response.text();
-
-      let data = {};
-      try {
-        data = JSON.parse(responseText);
-      } catch (e) {
-        console.error(`[B2B Portal] Ender Yapı API yanıtı JSON değil:`, responseText.substring(0, 200));
-        throw new Error("API yanıtı JSON formatında değil.");
-      }
-
-      function findArrayDeep(obj, depth = 0) {
-        if (!obj || typeof obj !== 'object' || depth > 3) return null;
-        if (Array.isArray(obj)) return obj;
-        for (const key of Object.keys(obj)) {
-          if (Array.isArray(obj[key])) {
-            return obj[key];
-          }
-        }
-        for (const key of Object.keys(obj)) {
-          if (obj[key] && typeof obj[key] === 'object') {
-            const found = findArrayDeep(obj[key], depth + 1);
-            if (found) return found;
-          }
-        }
-        return null;
-      }
-
-      let list = [];
-      if (data.Data && data.Data.Hits && data.Data.Hits.$values) {
-        list = data.Data.Hits.$values;
-      } else {
-        list = findArrayDeep(data.Data) || findArrayDeep(data.data) || findArrayDeep(data) || [];
-      }
-      const config = PARSERS[siteKey];
-      let itemsFoundCount = 0;
-
-      list.forEach(jsonRow => {
-        try {
-          const details = jsonRow.ProductDetails || {};
-          const name = details.ProductName || jsonRow.ProductName || jsonRow.Title || jsonRow.Name || 'Bilinmeyen Ürün';
-          const code = details.ProductCode || jsonRow.ProductCode || jsonRow.Code || '';
-          const id = jsonRow.ProductID || details.ProductID || jsonRow.Id || '';
-
-          let rawPrice = 0;
-
-          if (jsonRow.ProductPrices) {
-            if (Array.isArray(jsonRow.ProductPrices)) {
-              const pObj = jsonRow.ProductPrices[0] || {};
-              rawPrice = pObj.Price || pObj.Value || pObj.NetPrice || 0;
-            } else if (jsonRow.ProductPrices.$values && Array.isArray(jsonRow.ProductPrices.$values)) {
-              const pObj = jsonRow.ProductPrices.$values[0] || {};
-              rawPrice = pObj.Price || pObj.Value || pObj.NetPrice || 0;
-            } else if (jsonRow.ProductPrices.Values && Array.isArray(jsonRow.ProductPrices.Values)) {
-              const pObj = jsonRow.ProductPrices.Values[0] || {};
-              rawPrice = pObj.Price || pObj.Value || pObj.NetPrice || 0;
-            } else {
-              rawPrice = jsonRow.ProductPrices.Price || jsonRow.ProductPrices.NetPrice || jsonRow.ProductPrices.PriceWithOrWithoutTax || 0;
-            }
-          }
-
-          if (!rawPrice) {
-            rawPrice = jsonRow.DiscountPrice || jsonRow.NetPrice || jsonRow.Price || jsonRow.B2BPrice ||
-              details.DiscountPrice || details.NetPrice || details.Price || details.B2BPrice || 0;
-          }
-
-          let basePrice = typeof rawPrice === 'number' ? rawPrice : parsePrice(rawPrice.toString());
-          const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
-          const key = `b2b_${domain.replace(/\./g, '_')}_${id || code || cleanName}`;
-
-          let imgPath = (details.ImageUrl || jsonRow.DefaultImage || jsonRow.Image || jsonRow.ImageUrl || '').trim();
-          let imgUrl = '';
-          if (imgPath) {
-            imgUrl = imgPath.split(' ').join('%20');
-            if (!imgUrl.startsWith('http')) {
-              imgUrl = `https://b2b.enderyapi.com.tr/${imgUrl.startsWith('/') ? imgUrl.substring(1) : imgUrl}`;
-            }
-          }
-
-          let unit = '';
-          const possibleUnits = [
-            details.StockTypeName,
-            jsonRow.StockTypeName,
-            jsonRow.Unit,
-            details.Unit,
-            jsonRow.UnitName,
-            details.UnitName,
-            jsonRow.StockUnit,
-            details.StockUnit,
-            jsonRow.StockUnitName,
-            details.StockUnitName
-          ];
-
-          if (jsonRow.ProductPrices) {
-            let pricesList = [];
-            if (Array.isArray(jsonRow.ProductPrices)) pricesList = jsonRow.ProductPrices;
-            else if (jsonRow.ProductPrices.$values && Array.isArray(jsonRow.ProductPrices.$values)) pricesList = jsonRow.ProductPrices.$values;
-            if (pricesList.length > 0 && pricesList[0].UnitName) {
-              possibleUnits.push(pricesList[0].UnitName);
-            }
-          }
-
-          for (const u of possibleUnits) {
-            if (u && typeof u === 'string' && u.trim()) {
-              unit = u.trim().toUpperCase();
-              break;
-            }
-          }
-
-          if (unit.includes('PAKET') || unit.includes('KOLİ') || unit.includes('KUTU') || unit.includes('DZ') || unit.includes('DÜZİNE') || unit.includes('SET') || unit.includes('TAKIM')) {
-            unit = (unit.includes('DZ') || unit.includes('DÜZİNE')) ? 'DÜZİNE' :
-              (unit.includes('KOLİ') ? 'KOLİ' :
-                (unit.includes('KUTU') ? 'KUTU' : 'PAKET'));
-          } else {
-            unit = 'ADET';
-          }
-
-          let packQuantity = parsePackQuantityFromName(name);
-
-          if (!packQuantity) {
-            const possibleMultipliers = [
-              details.Field1,
-              jsonRow.Field1,
-              jsonRow.SubUnitMultiplier,
-              details.SubUnitMultiplier,
-              jsonRow.BoxQuantity,
-              details.BoxQuantity,
-              jsonRow.PackQuantity,
-              details.PackQuantity,
-              jsonRow.Multiplier,
-              details.Multiplier,
-              jsonRow.OrderMultiplier,
-              details.OrderMultiplier
-            ];
-
-            packQuantity = 1;
-            for (const m of possibleMultipliers) {
-              if (m !== undefined && m !== null) {
-                const val = parseInt(m.toString().trim(), 10);
-                if (val >= 1) {
-                  packQuantity = val;
-                  break;
-                }
-              }
-            }
-
-            let boxInfo = (jsonRow.BoxInfo || details.BoxInfo || '').trim();
-            if (boxInfo && packQuantity === 1) {
-              const match = boxInfo.match(/(?:KOLİ|KOLI|PAKET|KUTU|DZ|DÜZİNE)\s*:\s*(\d+)/i);
-              if (match) {
-                packQuantity = parseInt(match[1], 10);
-              } else {
-                const numMatch = boxInfo.match(/(\d+)/);
-                if (numMatch) packQuantity = parseInt(numMatch[1], 10);
-              }
-            }
-          }
-
-          if (!isNaN(basePrice) && basePrice > 0) {
-            state.currentResults.push({
-              key,
-              name,
-              basePrice: basePrice,
-              domain,
-              imgUrl,
-              sourceKey: siteKey,
-              sourceName: config.name,
-              badgeClass: config.badgeClass,
-              unit,
-              packQuantity
-            });
-            itemsFoundCount++;
-          }
-        } catch (err) {
-          console.error(`Ender Yapı satır çözme hatası:`, err);
-        }
-      });
-
-      updateStatusIndicator(siteKey, 'success', `${itemsFoundCount} Ürün`);
-      if (itemsFoundCount > 0) updateSessionActive(siteKey);
-    } catch (error) {
-      console.error(`Ender Yapı veri çekme hatası:`, error);
-      if (error.message && (error.message.includes('Oturum') || error.message.includes('401'))) {
-        updateStatusIndicator(siteKey, 'error', 'Pasif');
-      } else {
-        updateStatusIndicator(siteKey, 'error', 'Hata Oluştu');
-      }
-    }
-    return;
-  }
-
-  // --- POLİSAN BAYİ (SITE_D) ENTEGRASYONU ---
-  if (siteKey === 'SITE_D') {
-    const origin = new URL(searchUrl).origin;
-    const config = PARSERS[siteKey];
-    let itemsFoundCount = 0;
-
-    try {
-      let activeCampaignCode = '';
-      const storedData = await chrome.storage.local.get('polisanCampaignCode');
-      if (storedData && storedData.polisanCampaignCode) {
-        activeCampaignCode = storedData.polisanCampaignCode;
-      }
-
-      const allTabs = await new Promise((resolve) => {
-        chrome.tabs.query({}, resolve);
-      });
-      const polisanTabs = allTabs.filter(t => t.url && t.url.includes('polisankansai.com'));
-
-      let verificationToken = '';
-
-      if (polisanTabs.length > 0) {
-        const targetTab = polisanTabs[0];
-
-        const results = await chrome.scripting.executeScript({
-          target: { tabId: targetTab.id },
-          world: "MAIN",
-          func: () => {
-            let token = '';
-            let campaign = '';
-
-            try {
-              if (typeof mbis !== 'undefined' && mbis.requestVerificationToken) {
-                token = mbis.requestVerificationToken;
-              }
-              if (!token) {
-                const input = document.querySelector('input[name="__RequestVerificationToken"]');
-                if (input) token = input.value;
-              }
-
-              const htmlContent = document.documentElement.innerHTML;
-              const kMatches = htmlContent.match(/\b(K\d{7})\b/g);
-              if (kMatches && kMatches.length > 0) {
-                campaign = kMatches[0];
-              }
-
-              if (!campaign && typeof ko !== 'undefined') {
-                const bindEl = document.querySelector('[data-bind*="campaign"]') || document.querySelector('[data-bind]');
-                if (bindEl) {
-                  const vm = ko.dataFor(bindEl);
-                  if (vm) {
-                    if (vm.campaignCode) campaign = ko.unwrap(vm.campaignCode);
-                    else if (vm.activeCampaignCode) campaign = ko.unwrap(vm.activeCampaignCode);
-                  }
-                }
-              }
-            } catch (err) {
-              // Yoksay
-            }
-
-            return { token, campaign };
-          }
-        });
-
-        const res = results[0]?.result;
-        if (res) {
-          verificationToken = res.token;
-          if (res.campaign) {
-            activeCampaignCode = res.campaign;
-            chrome.storage.local.set({ polisanCampaignCode: activeCampaignCode });
-          }
-        }
-      }
-
-      if (!verificationToken) {
-        const pageRes = await fetch(`${origin}/order/makeordernew`, { credentials: 'include' });
-        if (pageRes.ok) {
-          const pageHtml = await pageRes.text();
-          const tokenMatch = pageHtml.match(/mbis\.requestVerificationToken\s*=\s*["']([^"']+)["']/i);
-          if (tokenMatch) verificationToken = tokenMatch[1];
-
-          if (!activeCampaignCode) {
-            const kMatch = pageHtml.match(/\b(K\d{7})\b/) || pageHtml.match(/value=["'](K\d{7})["']/i);
-            if (kMatch) {
-              activeCampaignCode = kMatch[1];
-              chrome.storage.local.set({ polisanCampaignCode: activeCampaignCode });
-            }
-          }
-        }
-      }
-
-      if (!verificationToken) throw new Error("Verification token bulunamadı (Oturum kapalı olabilir)");
-
-      const apiUrl = `${origin}/api/Orders/SearchProductElastic`;
-      const searchPayload = {
-        options: [],
-        categoryCode: 0,
-        prefix: query,
-        hasStock: false,
-        size: 100,
-        pageIndex: 0,
-        campaignCode: activeCampaignCode
-      };
-
-      const apiRes = await fetch(apiUrl, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'requestVerificationToken': verificationToken,
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: JSON.stringify(searchPayload)
-      });
-
-      if (!apiRes.ok) throw new Error(`API Hatası: ${apiRes.status}`);
-
-      const data = await apiRes.json();
-      const list = data.list || [];
-
-      list.forEach(item => {
-        const name = item.name || 'Bilinmeyen Ürün';
-        const sku = item.sku || '';
-        const basePrice = typeof item.price === 'number' ? item.price : parsePrice(item.price ? item.price.toString() : '');
-
-        const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
-        const key = `b2b_${domain.replace(/\./g, '_')}_${sku || cleanName}`;
-
-        let imgUrl = item.pictureUrl || '';
-        if (imgUrl && !imgUrl.startsWith('http')) {
-          imgUrl = imgUrl.startsWith('/') ? `${origin}${imgUrl}` : `${origin}/${imgUrl}`;
-        }
-
-        let unit = (item.unit || item.unitName || item.measurementUnit || 'ADET').trim().toUpperCase();
-        if (unit.includes('PAKET') || unit.includes('KOLİ') || unit.includes('KUTU')) {
-          unit = unit.includes('PAKET') ? 'PAKET' : (unit.includes('KOLİ') ? 'KOLİ' : 'KUTU');
-        } else {
-          unit = 'ADET';
-        }
-
-        let packQuantity = parsePackQuantityFromName(name);
-        if (!packQuantity) {
-          packQuantity = 1;
-          if (item.boxQty && item.boxQty > 1) {
-            packQuantity = item.boxQty;
-          } else if (item.boxQuantity && item.boxQuantity > 1) {
-            packQuantity = item.boxQuantity;
-          } else if (item.packQty && item.packQty > 1) {
-            packQuantity = item.packQty;
-          } else if (item.multiplier && item.multiplier > 1) {
-            packQuantity = item.multiplier;
-          }
-        }
-
-        if (!isNaN(basePrice) && basePrice > 0) {
-          state.currentResults.push({
-            key,
-            name,
-            basePrice,
-            domain,
-            imgUrl,
-            sourceKey: siteKey,
-            sourceName: config.name,
-            badgeClass: config.badgeClass,
-            unit,
-            packQuantity
-          });
-          itemsFoundCount++;
-        }
-      });
-
-      updateStatusIndicator(siteKey, 'success', `${itemsFoundCount} Ürün`);
-      if (itemsFoundCount > 0) updateSessionActive(siteKey);
-      return;
-
-    } catch (apiError) {
-      console.error(`[B2B Polisan] API Hatası nedeniyle HTML Fallback moduna geçiliyor:`, apiError);
-    }
-
-    // --- FALLBACK HTML PARSER YÖNTEMİ ---
-    try {
-      const response = await fetch(searchUrl, {
-        method: 'GET',
-        credentials: 'include'
-      });
-
-      if (!response.ok) throw new Error(`HTTP Hata: ${response.status}`);
-      const htmlText = await response.text();
-
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(htmlText, 'text/html');
-      const rows = doc.querySelectorAll(config.rowSelector);
-
-      rows.forEach(row => {
-        try {
-          const item = config.parseRow(row, domain);
-          if (item && !isNaN(item.basePrice) && item.basePrice > 0) {
-            state.currentResults.push({
-              ...item,
-              sourceKey: siteKey,
-              sourceName: config.name,
-              badgeClass: config.badgeClass
-            });
-            itemsFoundCount++;
-          }
-        } catch (err) {
-          console.error(`Polisan Fallback satır okuma hatası:`, err);
-        }
-      });
-
-      updateStatusIndicator(siteKey, 'success', `${itemsFoundCount} Ürün (HTML)`);
-      if (itemsFoundCount > 0) updateSessionActive(siteKey);
-    } catch (htmlError) {
-      console.error(`Polisan Fallback veri çekme hatası:`, htmlError);
-      updateStatusIndicator(siteKey, 'error', 'Hata Oluştu');
-    }
-    return;
-  }
-
-  // --- AKYÜZLER (SITE_E) API ENTEGRASYONU ---
-  if (siteKey === 'SITE_E') {
-    const origin = new URL(searchUrl).origin;
-    const config = PARSERS[siteKey];
-    let itemsFoundCount = 0;
-
-    try {
-      const storageData = await new Promise(r => chrome.storage.local.get('akyuz_token', r));
-      const token = storageData.akyuz_token;
-
-      const apiUrl = `${origin}/Search/SearchProduct`;
-      const searchPayload = {
-        dataCount: 0,
-        manufacturer: null,
-        vehicleBrand: null,
-        vehicleModel: null,
-        productGroup1: null,
-        productGroup2: null,
-        productGroup3: null,
-        t9Text: query,
-        campaign: false,
-        newArrival: false,
-        newProduct: false,
-        comparsionProduct: false,
-        onQuantity: false,
-        onWay: false,
-        image: false,
-        isNewSearch: true
-      };
-
-      const headers = {
-        'Content-Type': 'application/json;charset=UTF-8',
-        'Accept': 'application/json, text/plain, */*'
-      };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const apiRes = await fetch(apiUrl, {
-        method: 'POST',
-        credentials: 'include',
-        headers: headers,
-        body: JSON.stringify(searchPayload)
-      });
-
-      if (!apiRes.ok) {
-        throw new Error(`API Hatası: ${apiRes.status}`);
-      }
-
-      const responseText = await apiRes.text();
-      let list = [];
-      try {
-        list = JSON.parse(responseText) || [];
-      } catch (jsonError) {
-        throw new Error('Oturumunuz Kapanmış Olabilir. Lütfen B2B Portalına Giriş Yapın.');
-      }
-
-      list.forEach((item, index) => {
-        try {
-          const name = item.Name || 'Bilinmeyen Ürün';
-          const code = item.Code || '';
-
-          const rawPriceStr = (item.PriceNetWithVatCustomerStr || '').replace(/<[^>]*>/g, '').trim();
-          const rawPrice = parsePrice(rawPriceStr);
-          const vatRate = typeof item.VatRate === 'number' ? item.VatRate : 20;
-          const basePrice = rawPrice / (1 + vatRate / 100);
-
-          const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
-          const key = `b2b_${domain.replace(/\./g, '_')}_${item.Id || code || cleanName}`;
-
-          let imgUrl = item.PicturePath || '';
-          if (imgUrl && !imgUrl.startsWith('http')) {
-            if (imgUrl.includes('nophoto.png')) {
-              imgUrl = '';
-            } else {
-              imgUrl = imgUrl.startsWith('/') ? `${origin}${imgUrl}` : `${origin}/${imgUrl}`;
-            }
-          }
-
-          let unit = (item.Unit || 'ADET').trim().toUpperCase();
-          if (unit.includes('PAKET') || unit.includes('KOLİ') || unit.includes('KUTU')) {
-            unit = unit.includes('PAKET') ? 'PAKET' : (unit.includes('KOLİ') ? 'KOLİ' : 'KUTU');
-          } else {
-            unit = 'ADET';
-          }
-
-          let packQuantity = parsePackQuantityFromName(name);
-          if (!packQuantity) {
-            packQuantity = typeof item.QuantityInPackage === 'number' ? item.QuantityInPackage : 1;
-          }
-
-          if (!isNaN(basePrice) && basePrice > 0) {
-            state.currentResults.push({
-              key,
-              name,
-              basePrice,
-              domain,
-              imgUrl,
-              sourceKey: siteKey,
-              sourceName: config.name,
-              badgeClass: config.badgeClass,
-              unit,
-              packQuantity
-            });
-            itemsFoundCount++;
-          }
-        } catch (err) {
-          console.error(`[B2B Akyüzler] Satır işleme hatası (İndeks: ${index}):`, err);
-        }
-      });
-
-      updateStatusIndicator(siteKey, 'success', `${itemsFoundCount} Ürün`);
-      if (itemsFoundCount > 0) updateSessionActive(siteKey);
-      return;
-    } catch (apiError) {
-      console.error(`[B2B Portal] Akyüzler API entegrasyon hatası:`, apiError);
-      updateStatusIndicator(siteKey, 'error', 'Hata Oluştu');
-      return;
-    }
-  }
-
-  // --- DÜZ METAL (SITE_J) API SORGU YÖNTEMİ ---
-  if (siteKey === 'SITE_J') {
-    const config = PARSERS[siteKey];
-    let storageData = await new Promise(r => chrome.storage.local.get('duzmetal_token', r));
-    let token = storageData.duzmetal_token;
-
-    async function loginDuzMetal() {
-      const syncData = await new Promise(r => chrome.storage.sync.get(['cred_company_site_j', 'cred_user_site_j', 'cred_pass_site_j'], r));
-      const payload = {
-        bayiKod: (syncData.cred_company_site_j || 'MA301').trim(),
-        kullaniciAdi: (syncData.cred_user_site_j || 'AYGUNLER').trim(),
-        sifre: (syncData.cred_pass_site_j || 'MA301').trim()
-      };
-      const res = await fetch('https://api.duzmetal.com/auth/giris', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      if (data && data.status && data.data && data.data.Token) {
-        await new Promise(r => chrome.storage.local.set({ duzmetal_token: data.data.Token, session_SITE_J: true }, r));
-        return data.data.Token;
-      }
-      throw new Error(data.messages || 'Düz Metal giriş başarısız');
-    }
-
-    if (!token) {
-      try {
-        token = await loginDuzMetal();
-      } catch (err) {
-        console.error('[B2B Portal] Düz Metal token alınamadı:', err);
-        updateStatusIndicator(siteKey, 'error', 'Giriş Başarısız');
-        return;
-      }
-    }
-
-    const apiUrl = 'https://api.duzmetal.com/urun';
-    const postBody = {
-      kelime: query,
-      sayfa: 1,
-      isSayfa: false
-    };
-
-    try {
-      let response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(postBody)
-      });
-
-      if (response.status === 401) {
-        // Token süresi dolmuş olabilir, tekrar giriş yapıp dene
-        token = await loginDuzMetal();
-        response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(postBody)
-        });
-      }
-
-      if (response.status === 404) {
-        updateStatusIndicator(siteKey, 'idle', '0 Ürün');
-        return;
-      }
-
-      if (!response.ok) throw new Error(`HTTP Hata: ${response.status}`);
-
-      const data = await response.json();
-      if (!data || !data.data) {
-        updateStatusIndicator(siteKey, 'idle', '0 Ürün');
-        return;
-      }
-
-      const list = data.data.veri || data.data.list || (Array.isArray(data.data) ? data.data : []);
-      let itemsFoundCount = 0;
-
-      list.forEach(item => {
-        try {
-          let name = 'Bilinmeyen Ürün';
-          if (typeof item.o_baslik === 'string') {
-            try {
-              const bObj = JSON.parse(item.o_baslik);
-              name = bObj.baslik || (bObj.dil_ceviri && bObj.dil_ceviri.tr) || item.o_baslik;
-            } catch {
-              name = item.o_baslik;
-            }
-          } else if (item.o_baslik && typeof item.o_baslik === 'object') {
-            name = item.o_baslik.baslik || name;
-          }
-
-          const code = item.o_kod || '';
-          const id = item.o_id || '';
-
-          let rawPrice = 0;
-          let currency = 'TRY';
-          if (item.o_fiyat) {
-            let fObj = item.o_fiyat;
-            if (typeof fObj === 'string') {
-              try { fObj = JSON.parse(fObj); } catch { fObj = {}; }
-            }
-            rawPrice = fObj.o_fiyat_birim_kdvsiz || fObj.o_fiyat_birim_yerel || fObj.o_fiyat_birim || 0;
-            const curStr = fObj.o_fiyat_birim_kdvsiz_doviz || fObj.o_fiyat_birim_doviz || '';
-            if (curStr.includes('$') || curStr.toUpperCase().includes('USD')) currency = 'USD';
-            else if (curStr.includes('€') || curStr.toUpperCase().includes('EUR')) currency = 'EUR';
-          }
-
-          let basePrice = typeof rawPrice === 'number' ? rawPrice : parsePrice(rawPrice.toString());
-          if (currency === 'USD') {
-            basePrice = basePrice * state.exchangeRates.USD;
-          } else if (currency === 'EUR') {
-            basePrice = basePrice * state.exchangeRates.EUR;
-          }
-
-          let imgUrl = '';
-          if (item.o_resim_list) {
-            let rList = item.o_resim_list;
-            if (typeof rList === 'string') {
-              try { rList = JSON.parse(rList); } catch { rList = []; }
-            }
-            if (Array.isArray(rList) && rList.length > 0) {
-              imgUrl = rList[0].url || '';
-            }
-          }
-
-          let unit = 'ADET';
-          if (item.o_birim) {
-            let birimObj = item.o_birim;
-            if (typeof birimObj === 'string') {
-              try { birimObj = JSON.parse(birimObj); } catch { birimObj = {}; }
-            }
-            if (birimObj.baslik) unit = birimObj.baslik.toUpperCase();
-          }
-
-          let packQuantity = item.o_koli_ici || parsePackQuantityFromName(name) || 1;
-
-          const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
-          const key = `b2b_duzmetal_${id || code || cleanName}`;
-
-          if (!isNaN(basePrice) && basePrice > 0) {
-            state.currentResults.push({
-              key,
-              name,
-              basePrice,
-              domain,
-              imgUrl,
-              sourceKey: siteKey,
-              sourceName: config.name,
-              badgeClass: config.badgeClass,
-              unit,
-              packQuantity
-            });
-            itemsFoundCount++;
-          }
-        } catch (itemErr) {
-          console.error('[Düz Metal] Ürün satırı çözme hatası:', itemErr);
-        }
-      });
-
-      updateStatusIndicator(siteKey, 'success', `${itemsFoundCount} Ürün`);
-      if (itemsFoundCount > 0) updateSessionActive(siteKey);
-    } catch (error) {
-      console.error(`[B2B Portal] Düz Metal arama hatası:`, error);
-      if (error.message && error.message.includes('401')) {
-        updateStatusIndicator(siteKey, 'error', 'Pasif');
-      } else {
-        updateStatusIndicator(siteKey, 'error', 'Hata Oluştu');
-      }
-    }
-    return;
-  }
-
-
-  // --- YAŞAR TEKNİK (SITE_C) HTML YÖNTEMİ ---
-  try {
-    const response = await fetch(searchUrl, {
-      method: 'GET',
-      credentials: 'include',
-      headers: {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
-      }
-    });
-
-    if (!response.ok) throw new Error(`HTTP Hata: ${response.status}`);
-
-    const htmlText = await response.text();
-
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlText, 'text/html');
-
-    console.log(`[B2B Fetch Debug] Site: ${siteKey}, URL: ${searchUrl}`);
-    console.log(`[B2B Fetch Debug] HTML Uzunluğu: ${htmlText.length} karakter`);
-
-    // Oturum Kapalı / Giriş Sayfası Tespiti (Tok Ticaret, Yaşar Teknik & Rico B2B)
-    const isLoginPage = htmlText.includes('frmLogin') || 
-                        htmlText.includes('Login.asp') || 
-                        htmlText.includes('LoginForm') ||
-                        htmlText.includes('Kullanici_Adi') ||
-                        htmlText.includes('KullaniciAdiForm') || 
-                        htmlText.includes('KullaniciKodu') ||
-                        !!doc.querySelector('input[type="password"]');
-
-    if (isLoginPage && (siteKey === 'SITE_I' || siteKey === 'SITE_C' || siteKey === 'SITE_K') && !isRetry) {
-      console.log(`[B2B Portal] ${siteKey} (${PARSERS[siteKey]?.name}) oturumu kapalı tespit edildi! Otomatik arka plan girişi yapılıyor...`);
-      updateStatusIndicator(siteKey, 'loading', 'Giriş Yapılıyor...');
-
-      await new Promise(resolve => {
-        chrome.runtime.sendMessage({ action: "manual_login", siteKey: siteKey }, (res) => {
-          resolve(res);
-        });
-      });
-
-      console.log(`[B2B Portal] ${siteKey} otomatik giriş tamamlandı, arama yeniden tetikleniyor...`);
-      return fetchFromB2B(siteKey, query, true);
-    }
-
-    const config = PARSERS[siteKey];
-    const rows = doc.querySelectorAll(config.rowSelector);
-
-    let itemsFoundCount = 0;
-
-    rows.forEach(row => {
-      try {
-        const item = config.parseRow(row, domain);
-        if (item && !isNaN(item.basePrice) && item.basePrice > 0) {
-          const parsedPackQty = parsePackQuantityFromName(item.name);
-          state.currentResults.push({
-            ...item,
-            unit: parsedPackQty ? 'PAKET' : item.unit,
-            packQuantity: parsedPackQty || item.packQuantity,
-            basePrice: item.basePrice,
-            sourceKey: siteKey,
-            sourceName: config.name,
-            badgeClass: config.badgeClass
-          });
-          itemsFoundCount++;
-        }
-      } catch (err) {
-        console.error(`${config.name} satır okuma hatası:`, err);
-      }
-    });
-
-    updateStatusIndicator(siteKey, 'success', `${itemsFoundCount} Ürün`);
-    if (itemsFoundCount > 0) updateSessionActive(siteKey);
-  } catch (error) {
-    console.error(`${PARSERS[siteKey].name} veri çekme hatası:`, error);
-    if (error.message && (error.message.includes('401') || error.message.includes('403') || error.message.includes('Login'))) {
-      updateStatusIndicator(siteKey, 'error', 'Pasif');
-    } else {
-      updateStatusIndicator(siteKey, 'error', 'Hata Oluştu');
-    }
-  }
+  return adapter.search(query, isRetry);
 }
 
 // Dinamik filtre butonlarını çizen fonksiyon
@@ -1603,58 +263,6 @@ export function renderFilterButtons() {
   });
 }
 
-// Sonuçları Ekrana Çizme
-export function renderResults() {
-  const container = document.getElementById('comparison-results');
-  if (!container) return;
-
-  // Dinamik filtre butonlarını çizelim
-  renderFilterButtons();
-
-  if (state.currentResults.length === 0) {
-    container.innerHTML = `
-      <tr>
-        <td colspan="7" class="empty-state">
-          <div class="empty-state-content">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <p>Aradığınız kriterlere uygun hiçbir ürün bulunamadı. Lütfen B2B sitelerine giriş yaptığınızdan emin olun.</p>
-          </div>
-        </td>
-      </tr>
-    `;
-    document.getElementById('results-count').textContent = "Ürün bulunamadı.";
-    return;
-  }
-
-  // Filtreleme mantığı
-  let filtered = state.currentResults;
-  if (state.selectedFilterSite && state.selectedFilterSite !== 'ALL') {
-    filtered = state.currentResults.filter(p => p.sourceKey === state.selectedFilterSite);
-  }
-
-  // Listelenen adet yazısı
-  if (state.selectedFilterSite && state.selectedFilterSite !== 'ALL') {
-    const siteName = PARSERS[state.selectedFilterSite]?.name || state.selectedFilterSite;
-    document.getElementById('results-count').textContent = `${filtered.length} / ${state.currentResults.length} ürün listelendi (${siteName})`;
-  } else {
-    document.getElementById('results-count').textContent = `${state.currentResults.length} adet ürün listelendi.`;
-  }
-
-  container.innerHTML = '';
-
-  if (filtered.length === 0) {
-    container.innerHTML = `
-      <tr>
-        <td colspan="7" class="empty-state">
-          <div class="empty-state-content">
-            <p>Bu siteye ait filtrelenmiş ürün bulunamadı.</p>
-          </div>
-        </td>
-      </tr>
-    `;
-    return;
-  }
-
 // Sonuçlar Tablosu Olay Görevlendirmesi (Event Delegation - Bellek ve Performans İyileştirmesi)
 let isResultsTableEventsBound = false;
 function setupResultsTableDelegation(container) {
@@ -1714,6 +322,58 @@ function setupResultsTableDelegation(container) {
   });
 }
 
+// Sonuçları Ekrana Çizme
+export function renderResults() {
+  const container = document.getElementById('comparison-results');
+  if (!container) return;
+
+  // Dinamik filtre butonlarını çizelim
+  renderFilterButtons();
+
+  if (state.currentResults.length === 0) {
+    container.innerHTML = `
+      <tr>
+        <td colspan="7" class="empty-state">
+          <div class="empty-state-content">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <p>Aradığınız kriterlere uygun hiçbir ürün bulunamadı. Lütfen B2B sitelerine giriş yaptığınızdan emin olun.</p>
+          </div>
+        </td>
+      </tr>
+    `;
+    document.getElementById('results-count').textContent = "Ürün bulunamadı.";
+    return;
+  }
+
+  // Filtreleme mantığı
+  let filtered = state.currentResults;
+  if (state.selectedFilterSite && state.selectedFilterSite !== 'ALL') {
+    filtered = state.currentResults.filter(p => p.sourceKey === state.selectedFilterSite);
+  }
+
+  // Listelenen adet yazısı
+  if (state.selectedFilterSite && state.selectedFilterSite !== 'ALL') {
+    const siteName = PARSERS[state.selectedFilterSite]?.name || state.selectedFilterSite;
+    document.getElementById('results-count').textContent = `${filtered.length} / ${state.currentResults.length} ürün listelendi (${siteName})`;
+  } else {
+    document.getElementById('results-count').textContent = `${state.currentResults.length} adet ürün listelendi.`;
+  }
+
+  container.innerHTML = '';
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <tr>
+        <td colspan="7" class="empty-state">
+          <div class="empty-state-content">
+            <p>Bu siteye ait filtrelenmiş ürün bulunamadı.</p>
+          </div>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
   setupResultsTableDelegation(container);
   container.innerHTML = '';
   const fragment = document.createDocumentFragment();
@@ -1721,12 +381,16 @@ function setupResultsTableDelegation(container) {
   filtered.forEach((product) => {
     const discInfo = calculateTotalDiscountForProduct(product.name, product.key, product.sourceKey, product.basePrice);
 
+    const vatRate = product.vatRate || 20;
+    const vatMultiplier = 1 + (vatRate / 100);
     const purchaseNoVat = product.basePrice;
-    const purchaseWithVat = product.basePrice * 1.20;
+    const purchaseWithVat = (product.purchaseWithVat !== undefined && product.purchaseWithVat > 0)
+      ? product.purchaseWithVat
+      : product.basePrice * vatMultiplier;
 
     const margin = getEffectiveMargin(product.basePrice, product.sourceKey);
-    const rawSellingNoVat = calculateSellingPrice(product.basePrice, margin, false);
-    const rawSellingWithVat = calculateSellingPrice(product.basePrice, margin, true);
+    const rawSellingNoVat = calculateSellingPrice(product.basePrice, margin, false, vatRate);
+    const rawSellingWithVat = calculateSellingPrice(product.basePrice, margin, true, vatRate);
 
     const sellingNoVat = rawSellingNoVat * (1 - discInfo.discount / 100);
     const sellingWithVat = rawSellingWithVat * (1 - discInfo.discount / 100);
@@ -1755,7 +419,7 @@ function setupResultsTableDelegation(container) {
 
     let purchasePricesHtml = `
       <div class="price-main">
-        <span class="price-label" style="font-weight: 600;">Adet KDV'li Alış:</span>
+        <span class="price-label" style="font-weight: 600;">Adet KDV'li (%${vatRate}) Alış:</span>
         <span id="purchase-price-with-vat-${product.key}" style="font-weight: 700; color: var(--text);">${formatPrice(purchaseWithVat)}</span>
       </div>
       <div class="price-sub" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
@@ -1766,7 +430,7 @@ function setupResultsTableDelegation(container) {
 
     let sellingPricesHtml = `
       <div class="price-main" id="sell-price-with-vat-${product.key}">
-        <span class="price-label" style="font-size: 11px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 2px;">Adet KDV'li Satış:</span>
+        <span class="price-label" style="font-size: 11px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 2px;">Adet KDV'li (%${vatRate}) Satış:</span>
         <span style="font-size: 16px; font-weight: 850; color: #ffffff; background: #ef4444; padding: 4px 8px; border-radius: 6px; display: inline-block; box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3); font-family: 'Outfit', sans-serif;">${formatPrice(sellingWithVat)}</span>
       </div>
       <div class="price-sub" style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
@@ -1852,20 +516,27 @@ export function recalculateAllResults() {
   if (state.currentResults.length === 0) return;
 
   state.currentResults.forEach((product) => {
-    // Rico B2B gibi siteler için ayardaki iskonto değişimini ham fiyata yansıt
+    const vatRate = product.vatRate || 20;
+    const vatMultiplier = 1 + (vatRate / 100);
+
+    // Rico B2B gibi siteler için ayardaki iskonto değişimini ham fiyata ve KDV'li alışa yansıt
     if (product.sourceKey === 'SITE_K' && product.rawPrice) {
       const discountRate = (state.siteDiscounts && state.siteDiscounts.SITE_K !== undefined) ? state.siteDiscounts.SITE_K : 35;
       product.basePrice = product.rawPrice * (1 - discountRate / 100);
+      const rawVat = product.rawVatPrice || (product.rawPrice * vatMultiplier);
+      product.purchaseWithVat = rawVat * (1 - discountRate / 100);
     }
 
-    const discInfo = calculateTotalDiscountForProduct(product.name, product.key, product.sourceKey);
+    const discInfo = calculateTotalDiscountForProduct(product.name, product.key, product.sourceKey, product.basePrice);
 
     const purchaseNoVat = product.basePrice;
-    const purchaseWithVat = product.basePrice * 1.20;
+    const purchaseWithVat = (product.purchaseWithVat !== undefined && product.purchaseWithVat > 0)
+      ? product.purchaseWithVat
+      : product.basePrice * vatMultiplier;
 
     const margin = getEffectiveMargin(product.basePrice, product.sourceKey);
-    const rawSellingNoVat = calculateSellingPrice(product.basePrice, margin, false);
-    const rawSellingWithVat = calculateSellingPrice(product.basePrice, margin, true);
+    const rawSellingNoVat = calculateSellingPrice(product.basePrice, margin, false, vatRate);
+    const rawSellingWithVat = calculateSellingPrice(product.basePrice, margin, true, vatRate);
 
     const sellingNoVat = rawSellingNoVat * (1 - discInfo.discount / 100);
     const sellingWithVat = rawSellingWithVat * (1 - discInfo.discount / 100);
@@ -1883,7 +554,7 @@ export function recalculateAllResults() {
 
     if (sellPriceWithVatEl) {
       sellPriceWithVatEl.innerHTML = `
-        <span class="price-label" style="font-size: 11px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 2px;">Adet KDV'li Satış:</span>
+        <span class="price-label" style="font-size: 11px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 2px;">Adet KDV'li (%${vatRate}) Satış:</span>
         <span style="font-size: 16px; font-weight: 850; color: #ffffff; background: #ef4444; padding: 4px 8px; border-radius: 6px; display: inline-block; box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3); font-family: 'Outfit', sans-serif;">${formatPrice(sellingWithVat)}</span>
       `;
     }

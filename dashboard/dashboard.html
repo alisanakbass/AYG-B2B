@@ -11,10 +11,9 @@
     />
     <link rel="stylesheet" href="dashboard.css" />
     <link rel="icon" href="../logo.png" type="image/png" />
-    <script src="../xlsx.full.min.js"></script>
-    <script src="../jszip.min.js"></script>
-    <script src="../pdf.min.js"></script>
-    <script src="../tesseract.min.js"></script>
+    <script src="../lib/xlsx.full.min.js"></script>
+    <script src="../lib/jszip.min.js"></script>
+    <script src="../lib/pdf.min.js"></script>
   </head>
   <body>
     <div
@@ -61,7 +60,7 @@
         </button>
       </div>
       <button
-        onclick="this.parentElement.style.display = 'none'"
+        id="btn-close-update-banner"
         style="
           position: absolute;
           right: 15px;
@@ -703,7 +702,7 @@
             <span><strong>AYG Sipariş Modu Aktif:</strong> Seçtiğiniz ürünler canlı olarak AYG Sipariş Oluştur formuna aktarılır.</span>
           </div>
           <div style="display: flex; gap: 10px;">
-            <button id="btn-transfer-cart-to-ayg" onclick="if(window.transferCartToAygOrder) window.transferCartToAygOrder()" style="background: rgba(255,255,255,0.25); color: white; border: 1px solid rgba(255,255,255,0.4); padding: 6px 14px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: all 0.2s;">
+            <button id="btn-transfer-cart-to-ayg" style="background: rgba(255,255,255,0.25); color: white; border: 1px solid rgba(255,255,255,0.4); padding: 6px 14px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: all 0.2s;">
               🛒 Sepettekileri Siparişe Aktar
             </button>
           </div>

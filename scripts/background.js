@@ -151,6 +151,11 @@ async function keepYasarTeknikAlive() {
 
 // Tok Ticaret oturumunu sessizce canlı tutan fonksiyon
 async function keepTokTicaretAlive() {
+  const syncData = await new Promise(r => chrome.storage.sync.get({ 'site-i-check': true }, r));
+  if (!syncData['site-i-check']) {
+    return;
+  }
+
   try {
     const response = await fetch("https://bayi.tokticaret.com.tr/Default.asp", {
       method: "GET",
@@ -171,33 +176,6 @@ async function keepTokTicaretAlive() {
     }
   } catch (error) {
     console.error("[B2B KeepAlive] Tok Ticaret ping hatası:", error);
-  }
-
-  // Düz Metal Kontrolü
-  try {
-    const storageData = await new Promise(r => chrome.storage.local.get('duzmetal_token', r));
-    if (!storageData.duzmetal_token) {
-      console.log("[B2B KeepAlive] Düz Metal oturumu kapalı, otomatik giriş yapılıyor...");
-      await performLoginForSite('SITE_J');
-    } else {
-      const pingRes = await fetch("https://api.duzmetal.com/urun", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${storageData.duzmetal_token}`
-        },
-        body: JSON.stringify({ kelime: "test" })
-      });
-      if (pingRes.status === 401) {
-        console.log("[B2B KeepAlive] Düz Metal token süresi dolmuş, yenileniyor...");
-        await performLoginForSite('SITE_J');
-      } else {
-        console.log("[B2B KeepAlive] Düz Metal oturumu aktif.");
-        await updateStorageSession('SITE_J', true);
-      }
-    }
-  } catch (error) {
-    console.error("[B2B KeepAlive] Düz Metal ping hatası:", error);
   }
 }
 
@@ -285,38 +263,70 @@ async function performBackgroundLoginForAll() {
   }, r));
 
   const results = {};
-  if (storage['site-a-check']) {
-    results.SITE_A = await performLoginForSite('SITE_A');
-  }
-  if (storage['site-b-check']) {
-    results.SITE_B = await performLoginForSite('SITE_B');
-  }
-  if (storage['site-c-check']) {
-    results.SITE_C = await performLoginForSite('SITE_C');
-  }
-  if (storage['site-d-check']) {
-    results.SITE_D = await performLoginForSite('SITE_D');
-  }
-  if (storage['site-e-check']) {
-    results.SITE_E = await performLoginForSite('SITE_E');
-  }
-  if (storage['site-h-check']) {
-    results.SITE_H = await performLoginForSite('SITE_H');
-  }
-  if (storage['site-i-check']) {
-    results.SITE_I = await performLoginForSite('SITE_I');
-  }
-  if (storage['site-j-check']) {
-    results.SITE_J = await performLoginForSite('SITE_J');
-  }
-  if (storage['site-k-check']) {
-    results.SITE_K = await performLoginForSite('SITE_K');
-  }
+  const siteCheckMap = [
+    { checkKey: 'site-a-check', siteKey: 'SITE_A' },
+    { checkKey: 'site-b-check', siteKey: 'SITE_B' },
+    { checkKey: 'site-c-check', siteKey: 'SITE_C' },
+    { checkKey: 'site-d-check', siteKey: 'SITE_D' },
+    { checkKey: 'site-e-check', siteKey: 'SITE_E' },
+    { checkKey: 'site-h-check', siteKey: 'SITE_H' },
+    { checkKey: 'site-i-check', siteKey: 'SITE_I' },
+    { checkKey: 'site-j-check', siteKey: 'SITE_J' },
+    { checkKey: 'site-k-check', siteKey: 'SITE_K' }
+  ];
+
+  await Promise.all(
+    siteCheckMap
+      .filter(item => storage[item.checkKey])
+      .map(async (item) => {
+        results[item.siteKey] = await performLoginForSite(item.siteKey);
+      })
+  );
+
   return results;
 }
 
 // Belirli bir site için giriş işlemini gerçekleştir
 async function performLoginForSite(siteKey, isManual = false) {
+
+  if (siteKey === 'SITE_A') {
+    // Öz Karadeniz için sekme açmak yerine doğrudan arka planda AJAX POST ile sessiz giriş
+    const creds = await new Promise(r => chrome.storage.sync.get({
+      cred_user_site_a: "info@aygunleryapi.com",
+      cred_pass_site_a: "FZ0DT1YL*0OE"
+    }, r));
+
+    const email = creds.cred_user_site_a || "info@aygunleryapi.com";
+    const password = creds.cred_pass_site_a || "FZ0DT1YL*0OE";
+
+    try {
+      console.log(`[B2B Background] Öz Karadeniz sessiz giriş isteği yapılıyor... E-posta: ${email}`);
+      const loginRes = await fetch("https://b4b.ozkaradenizinsaat.com/login/login_request", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        body: `mail=${encodeURIComponent(email.trim())}&password=${encodeURIComponent(password.trim())}&remember=true`
+      });
+
+      if (loginRes.ok) {
+        const data = await loginRes.json();
+        console.log(`[B2B Background] Öz Karadeniz sessiz giriş yanıtı:`, data);
+        if (data && data.result) {
+          console.log("[B2B Background] Öz Karadeniz sessiz giriş başarılı.");
+          await updateStorageSession('SITE_A', true);
+          return { success: true, message: "Oturum Sessizce Açıldı" };
+        }
+      } else {
+        console.warn(`[B2B Background] Öz Karadeniz sessiz giriş HTTP hatası: ${loginRes.status} ${loginRes.statusText}`);
+      }
+    } catch (err) {
+      console.error("[B2B Background] Öz Karadeniz sessiz giriş hatası:", err);
+    }
+    console.log("[B2B Background] Öz Karadeniz sessiz giriş başarısız oldu, sekmeli yönteme geçiliyor.");
+  }
 
   if (siteKey === 'SITE_C') {
     // Yaşar Teknik için sekme açmak yerine önce sessizce arka planda AJAX POST giriş deniyoruz.
@@ -345,7 +355,7 @@ async function performLoginForSite(siteKey, isManual = false) {
         const text = await loginRes.text();
         const trimmedText = text.trim();
         console.log(`[B2B Background] Yaşar Teknik sessiz giriş yanıt aldı. HTTP: ${loginRes.status}, Yanıt Metni: "${trimmedText}"`);
-        if (trimmedText === "1" || trimmedText === "0") {
+        if (trimmedText === "1") {
           console.log("[B2B Background] Yaşar Teknik sessiz giriş başarılı.");
           await updateStorageSession('SITE_C', true);
           return { success: true, message: "Oturum Sessizce Açıldı" };
@@ -386,7 +396,7 @@ async function performLoginForSite(siteKey, isManual = false) {
         const text = await loginRes.text();
         const trimmedText = text.trim();
         console.log(`[B2B Background] Tok Ticaret sessiz giriş yanıtı: "${trimmedText}"`);
-        if (trimmedText === "1" || trimmedText === "0") {
+        if (trimmedText === "1") {
           console.log("[B2B Background] Tok Ticaret sessiz giriş başarılı.");
           await updateStorageSession('SITE_I', true);
           return { success: true, message: "Oturum Sessizce Açıldı" };
@@ -401,6 +411,14 @@ async function performLoginForSite(siteKey, isManual = false) {
   }
 
   if (siteKey === 'SITE_J') {
+    // Eğer halihazırda geçerli bir token varsa ve kullanıcı manuel 'Giriş Yap'a basmadıysa gereksiz oturum açma
+    if (!isManual) {
+      const storageData = await new Promise(r => chrome.storage.local.get(['duzmetal_token', 'session_SITE_J'], r));
+      if (storageData.duzmetal_token && storageData.session_SITE_J) {
+        return { success: true, message: "Mevcut Oturum Korundu" };
+      }
+    }
+
     const creds = await new Promise(r => chrome.storage.sync.get({
       cred_company_site_j: "MA301",
       cred_user_site_j: "AYGUNLER",

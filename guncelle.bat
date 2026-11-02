@@ -64,7 +64,7 @@ if /i "%choice%"=="E" (
     set "TASK_NAME=B2BEklentiOtomatikGuncelleme"
 
     :: Gorev Zamanlayicisina Gorevi Ekle (Gorev penceresiz calisan oto_guncelle.vbs'yi tetikler)
-    schtasks /create /tn "!TASK_NAME!" /tr "wscript.exe \"!SCRIPT_DIR!oto_guncelle.vbs\"" /sc minute /mo 15 /ru "SYSTEM" /f > nul
+    schtasks /create /tn "!TASK_NAME!" /tr "wscript.exe \"!SCRIPT_DIR!tools\oto_guncelle.vbs\"" /sc minute /mo 15 /ru "SYSTEM" /f > nul
 
     if !errorLevel! equ 0 (
         echo =====================================================

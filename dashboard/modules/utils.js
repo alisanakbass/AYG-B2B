@@ -76,10 +76,25 @@ export function parsePackQuantityFromName(name) {
   return null;
 }
 
+// KDV Oranı Çözümleme Yardımcısı (Metin, sayı, yüzde işaretli değerleri güvenli çözer)
+export function extractVatRate(val) {
+  if (val === undefined || val === null) return null;
+  if (typeof val === 'number' && !isNaN(val) && val > 0 && val <= 100) return val;
+  const str = val.toString().trim();
+  if (!str) return null;
+  const match = str.match(/(?:%|\b)\s*(\d+)/) || str.match(/(\d+)/);
+  if (match) {
+    const v = parseInt(match[1], 10);
+    if (v > 0 && v <= 100) return v;
+  }
+  return null;
+}
+
 // Satış Fiyatı Hesaplama
-export function calculateSellingPrice(basePrice, margin, includeVat) {
+export function calculateSellingPrice(basePrice, margin, includeVat, vatRate = 20) {
   const withMargin = basePrice * (1 + (margin / 100));
-  const finalPrice = includeVat ? withMargin * 1.20 : withMargin;
+  const vatMultiplier = 1 + (Number(vatRate) / 100);
+  const finalPrice = includeVat ? withMargin * vatMultiplier : withMargin;
   return parseFloat(finalPrice.toFixed(2));
 }
 

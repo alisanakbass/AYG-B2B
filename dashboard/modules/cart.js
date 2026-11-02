@@ -121,12 +121,14 @@ export function addToSharedCart(product, addedQty, buttonEl) {
       key: product.key,
       name: product.name,
       basePrice: product.basePrice,
+      purchaseWithVat: product.purchaseWithVat || (product.basePrice * (1 + ((product.vatRate || 20) / 100))),
       qty: newQty,
       domain: product.domain,
       sourceKey: product.sourceKey,
       unit: product.unit || 'ADET',
       packQuantity: product.packQuantity || 1,
-      imgUrl: product.imgUrl || '../logo.png'
+      imgUrl: product.imgUrl || '../logo.png',
+      vatRate: product.vatRate || 20
     };
 
     const setCartStorage = (newCart, cb) => {
@@ -195,15 +197,19 @@ export function renderCart() {
   container.innerHTML = '';
 
   items.forEach(item => {
+    const vatRate = item.vatRate || 20;
+    const vatMultiplier = 1 + (vatRate / 100);
     const purchaseNoVat = item.basePrice;
-    const purchaseWithVat = item.basePrice * 1.20;
+    const purchaseWithVat = (item.purchaseWithVat !== undefined && item.purchaseWithVat > 0)
+      ? item.purchaseWithVat
+      : item.basePrice * vatMultiplier;
 
     const sourceKey = item.sourceKey || getSourceKeyFromDomain(item.domain);
-    const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
+    const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey, item.basePrice);
 
     const margin = getEffectiveMargin(item.basePrice, sourceKey);
-    const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false);
-    const rawUnitPriceWithVat = calculateSellingPrice(item.basePrice, margin, true);
+    const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false, vatRate);
+    const rawUnitPriceWithVat = calculateSellingPrice(item.basePrice, margin, true, vatRate);
 
     const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
     const unitPriceWithVat = rawUnitPriceWithVat * (1 - discInfo.discount / 100);
@@ -215,7 +221,7 @@ export function renderCart() {
     const itemTotalNoVat = unitPriceNoVat * item.qty * multiplier;
     const itemTotalWithVat = unitPriceWithVat * item.qty * multiplier;
 
-    const netPurchaseWithVat = purchaseWithVat * (1 - discInfo.discount / 100);
+    const netPurchaseWithVat = purchaseWithVat;
     const itemTotalPurchaseWithVat = netPurchaseWithVat * item.qty * multiplier;
 
     grandTotalNoVat += itemTotalNoVat;
@@ -236,12 +242,13 @@ export function renderCart() {
     div.innerHTML = `
       <div class="cart-card-header" style="display: flex; gap: 10px; align-items: center;">
         <div class="cart-product-img-wrapper" style="width: 42px; height: 42px; background: var(--bg-input); border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(0,0,0,0.04); flex-shrink: 0;">
-          <img src="${item.imgUrl || '../logo.png'}" style="max-width: 100%; max-height: 100%; object-fit: contain;" onerror="this.src='../logo.png'">
+          <img src="${item.imgUrl || '../logo.png'}" class="cart-product-img" style="max-width: 100%; max-height: 100%; object-fit: contain;">
         </div>
         <div class="cart-card-title-group" style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
           <h4 class="cart-card-title" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</h4>
           <div style="display: flex; align-items: center; gap: 6px;">
             <span class="cart-card-domain-badge">${escapeHtml(item.domain.replace('www.', ''))}</span>
+            <span class="cart-card-domain-badge" style="background: rgba(14, 165, 233, 0.12); color: #0284c7; font-weight: 600;">%${vatRate} KDV</span>
             ${packInfo ? `<span style="font-size: 9.5px; color: var(--text-muted); font-weight: 600;">${packInfo}</span>` : ''}
           </div>
         </div>
@@ -367,15 +374,19 @@ export function confirmCart() {
   let totalProfitWithVat = 0;
 
   items.forEach(item => {
+    const vatRate = item.vatRate || 20;
+    const vatMultiplier = 1 + (vatRate / 100);
     const purchaseNoVat = item.basePrice;
-    const purchaseWithVat = item.basePrice * 1.20;
+    const purchaseWithVat = (item.purchaseWithVat !== undefined && item.purchaseWithVat > 0)
+      ? item.purchaseWithVat
+      : item.basePrice * vatMultiplier;
 
     const sourceKey = item.sourceKey || getSourceKeyFromDomain(item.domain);
-    const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
+    const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey, item.basePrice);
 
     const margin = getEffectiveMargin(item.basePrice, sourceKey);
-    const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false);
-    const rawUnitPriceWithVat = calculateSellingPrice(item.basePrice, margin, true);
+    const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false, vatRate);
+    const rawUnitPriceWithVat = calculateSellingPrice(item.basePrice, margin, true, vatRate);
 
     const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
     const unitPriceWithVat = rawUnitPriceWithVat * (1 - discInfo.discount / 100);
@@ -390,8 +401,8 @@ export function confirmCart() {
     grandTotalNoVat += itemTotalNoVat;
     grandTotalWithVat += itemTotalWithVat;
 
-    const netPurchaseNoVat = purchaseNoVat * (1 - discInfo.discount / 100);
-    const netPurchaseWithVat = purchaseWithVat * (1 - discInfo.discount / 100);
+    const netPurchaseNoVat = purchaseNoVat;
+    const netPurchaseWithVat = purchaseWithVat;
 
     const itemProfitWithVat = (unitPriceWithVat - netPurchaseWithVat) * item.qty * multiplier;
     totalProfitWithVat += itemProfitWithVat;
@@ -417,6 +428,7 @@ export function confirmCart() {
       <td style="padding: 10px; text-align: left; color: var(--text-muted); font-size: 11px;">
         ${escapeHtml(item.domain.replace('www.', ''))}
         <span style="font-size: 9px; display: block; padding: 1px 3px; border-radius: 3px; background: rgba(59, 130, 246, 0.1); color: #3b82f6; font-weight: 600; width: fit-content; margin-top: 2px;">${itemUnit} (x${itemPackQty})</span>
+        <span style="font-size: 9px; display: inline-block; padding: 1px 3px; border-radius: 3px; background: rgba(14, 165, 233, 0.12); color: #0284c7; font-weight: 600; width: fit-content; margin-top: 2px;">%${vatRate} KDV</span>
       </td>
       <td style="padding: 10px; text-align: center; font-weight: 600; line-height: 1.2;">${qtyDisplay}</td>
       <td style="padding: 10px; text-align: right; font-size: 11px;">
@@ -462,15 +474,19 @@ export function submitCart(onSuccess) {
   let totalProfitWithVat = 0;
 
   items.forEach(item => {
+    const vatRate = item.vatRate || 20;
+    const vatMultiplier = 1 + (vatRate / 100);
     const purchaseNoVat = item.basePrice;
-    const purchaseWithVat = item.basePrice * 1.20;
+    const purchaseWithVat = (item.purchaseWithVat !== undefined && item.purchaseWithVat > 0)
+      ? item.purchaseWithVat
+      : item.basePrice * vatMultiplier;
 
     const sourceKey = item.sourceKey || getSourceKeyFromDomain(item.domain);
-    const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
+    const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey, item.basePrice);
 
     const margin = getEffectiveMargin(item.basePrice, sourceKey);
-    const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false);
-    const rawUnitPriceWithVat = calculateSellingPrice(item.basePrice, margin, true);
+    const rawUnitPriceNoVat = calculateSellingPrice(item.basePrice, margin, false, vatRate);
+    const rawUnitPriceWithVat = calculateSellingPrice(item.basePrice, margin, true, vatRate);
 
     const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
     const unitPriceWithVat = rawUnitPriceWithVat * (1 - discInfo.discount / 100);
@@ -482,8 +498,8 @@ export function submitCart(onSuccess) {
     grandTotalNoVat += unitPriceNoVat * item.qty * multiplier;
     grandTotalWithVat += unitPriceWithVat * item.qty * multiplier;
 
-    const netPurchaseNoVat = purchaseNoVat * (1 - discInfo.discount / 100);
-    const netPurchaseWithVat = purchaseWithVat * (1 - discInfo.discount / 100);
+    const netPurchaseNoVat = purchaseNoVat;
+    const netPurchaseWithVat = purchaseWithVat;
 
     totalProfitNoVat += (unitPriceNoVat - netPurchaseNoVat) * item.qty * multiplier;
     totalProfitWithVat += (unitPriceWithVat - netPurchaseWithVat) * item.qty * multiplier;
@@ -500,12 +516,14 @@ export function submitCart(onSuccess) {
       name: i.name,
       qty: i.qty,
       basePrice: i.basePrice,
+      purchaseWithVat: i.purchaseWithVat,
       domain: i.domain,
       key: i.key || "",
       sourceKey: i.sourceKey || getSourceKeyFromDomain(i.domain),
       unit: i.unit || "ADET",
       packQuantity: i.packQuantity || 1,
-      imgUrl: i.imgUrl || ""
+      imgUrl: i.imgUrl || "",
+      vatRate: i.vatRate || 20
     }))
   };
 

@@ -13,8 +13,7 @@ if ($bytesRead -eq 4) {
     }
 
     # Güncelleme işlemi scriptini sessizce çalıştır
-    $rootDir = Split-Path $PSScriptRoot -Parent
-    $batPath = Join-Path $rootDir "oto_guncelle_islem.bat"
+    $batPath = Join-Path $PSScriptRoot "oto_guncelle_islem.bat"
 
     if (Test-Path $batPath) {
         $process = Start-Process -FilePath "cmd.exe" -ArgumentList "/c `"$batPath`"" -Wait -WindowStyle Hidden -PassThru

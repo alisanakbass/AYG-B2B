@@ -75,9 +75,9 @@ async function renderPdfToDataUrl(file) {
 
   if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
     if (typeof chrome !== 'undefined' && chrome.runtime?.getURL) {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("pdf.worker.min.js");
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("lib/pdf.worker.min.js");
     } else {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "../pdf.worker.min.js";
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "../lib/pdf.worker.min.js";
     }
   }
 

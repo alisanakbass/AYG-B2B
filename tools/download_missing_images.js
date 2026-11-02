@@ -3,9 +3,9 @@ const path = require('path');
 const https = require('https');
 
 // Local XLSX kütüphanesini require ediyoruz (Zero-dependency için)
-const XLSX = require('../xlsx.full.min.js');
+const XLSX = require('../lib/xlsx.full.min.js');
 
-const EXCEL_PATH = path.join(__dirname, '..', 'ADANA 20 HAZİRAN 2026 BORU FİYAT LİSTESİ.xlsx');
+const EXCEL_PATH = path.join(__dirname, '..', 'data', 'ADANA 20 HAZİRAN 2026 BORU FİYAT LİSTESİ.xlsx');
 const TEMP_EXCEL_PATH = path.join(__dirname, '..', 'temp_excel_copy.xlsx');
 const IMAGES_DIR = path.join(__dirname, '..', 'images');
 

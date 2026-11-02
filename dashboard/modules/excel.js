@@ -102,7 +102,8 @@ export async function fetchFromLocalFirat(query) {
           badgeClass,
           unit: item.unit || 'ADET',
           packQuantity: item.packQuantity || 1,
-          itemCode: item.code
+          itemCode: item.code,
+          vatRate: 20
         });
       }
 
@@ -123,7 +124,7 @@ export async function loadDefaultExcelIfEmpty() {
 
       console.log("[B2B Fırat] Yerel veritabanı boş, varsayılan Excel yükleniyor...");
       try {
-        const fileUrl = chrome.runtime.getURL("ADANA 20 HAZİRAN 2026 BORU FİYAT LİSTESİ.xlsx");
+        const fileUrl = chrome.runtime.getURL("data/ADANA 20 HAZİRAN 2026 BORU FİYAT LİSTESİ.xlsx");
         const response = await fetch(fileUrl);
         if (!response.ok) throw new Error(`Varsayılan Excel dosyası yüklenemedi: ${response.status}`);
 
@@ -275,6 +276,13 @@ export function setupExcelListeners() {
               }
             }
 
+            if (packaging) {
+              const qtyMatch = packaging.match(/^(\d+)/);
+              if (qtyMatch) {
+                packQuantity = parseInt(qtyMatch[1], 10);
+              }
+            }
+
             parsedProducts.push({
               code,
               name: `${name} (${packaging || 'Adet'})`,
@@ -325,6 +333,20 @@ export function setupExcelListeners() {
   }
 }
 
+let cachedTemplateArrayBuffer = null;
+async function getTeklifTemplateArrayBuffer() {
+  if (cachedTemplateArrayBuffer) {
+    return cachedTemplateArrayBuffer.slice(0);
+  }
+  const fileUrl = chrome.runtime.getURL("templates/AYG_TEKLİF.xlsx");
+  const response = await fetch(fileUrl);
+  if (!response.ok) {
+    throw new Error(`Teklif şablonu (templates/AYG_TEKLİF.xlsx) yüklenemedi: ${response.status}`);
+  }
+  cachedTemplateArrayBuffer = await response.arrayBuffer();
+  return cachedTemplateArrayBuffer.slice(0);
+}
+
 // Sepetteki veya verilen ürünleri teklif şablonuna yazıp indiren fonksiyon
 export async function exportCartAsExcelOffer(presetTeklifNo, metadata, customItems, includeVat = true) {
   const items = customItems || Object.values(state.currentCart);
@@ -337,20 +359,6 @@ export async function exportCartAsExcelOffer(presetTeklifNo, metadata, customIte
     alert("Teklif şablonu en fazla 100 ürün desteklemektedir. Lütfen sepetinizdeki ürün sayısını 100 veya daha az yapın.");
     return;
   }
-
-let cachedTemplateArrayBuffer = null;
-async function getTeklifTemplateArrayBuffer() {
-  if (cachedTemplateArrayBuffer) {
-    return cachedTemplateArrayBuffer.slice(0);
-  }
-  const fileUrl = chrome.runtime.getURL("AYG_TEKLİF.xlsx");
-  const response = await fetch(fileUrl);
-  if (!response.ok) {
-    throw new Error(`Teklif şablonu (AYG_TEKLİF.xlsx) yüklenemedi: ${response.status}`);
-  }
-  cachedTemplateArrayBuffer = await response.arrayBuffer();
-  return cachedTemplateArrayBuffer.slice(0);
-}
 
   const arrayBuffer = await getTeklifTemplateArrayBuffer();
   
@@ -584,13 +592,14 @@ async function getTeklifTemplateArrayBuffer() {
 
     // Fiyat ve indirim hesaplamaları
     const sourceKey = item.sourceKey || getSourceKeyFromDomain(item.domain);
-    const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey);
+    const discInfo = calculateTotalDiscountForProduct(item.name, item.key, sourceKey, item.basePrice);
     const margin = getEffectiveMargin(item.basePrice, sourceKey);
     
     // KDV'li veya KDV'siz (karsız alış) birim satış fiyatı
+    const itemVatRate = item.vatRate || 20;
     const rawUnitPriceNoVat = includeVat 
-      ? calculateSellingPrice(item.basePrice, margin, true) 
-      : calculateSellingPrice(item.basePrice, 0, false);
+      ? calculateSellingPrice(item.basePrice, margin, true, itemVatRate) 
+      : calculateSellingPrice(item.basePrice, 0, false, itemVatRate);
     const unitPriceNoVat = rawUnitPriceNoVat * (1 - discInfo.discount / 100);
     
     // Paket/Adet çarpanı
@@ -748,9 +757,9 @@ async function getTeklifTemplateArrayBuffer() {
 // Boş Şablon Teklif Excel Dosyasını İndiren Fonksiyon
 export async function downloadBlankTeklifExcel(customFilename) {
   try {
-    let templateUrl = "../AYG_TEKLİF.xlsx";
+    let templateUrl = "../templates/AYG_TEKLİF.xlsx";
     if (typeof chrome !== 'undefined' && chrome?.runtime?.getURL) {
-      templateUrl = chrome.runtime.getURL("AYG_TEKLİF.xlsx");
+      templateUrl = chrome.runtime.getURL("templates/AYG_TEKLİF.xlsx");
     }
 
     const response = await fetch(templateUrl);
@@ -788,9 +797,9 @@ export async function exportSantiyeOfferAsExcel(santiyeData) {
       return;
     }
 
-    let templateUrl = "../AYG_TEKLİF.xlsx";
+    let templateUrl = "../templates/AYG_TEKLİF.xlsx";
     if (typeof chrome !== 'undefined' && chrome?.runtime?.getURL) {
-      templateUrl = chrome.runtime.getURL("AYG_TEKLİF.xlsx");
+      templateUrl = chrome.runtime.getURL("templates/AYG_TEKLİF.xlsx");
     }
 
     const response = await fetch(templateUrl);

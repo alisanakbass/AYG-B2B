@@ -885,6 +885,18 @@ function setupUIEventListeners() {
     });
   }
 
+  // Sol menüdeki Fırat Boru "Güncelle" butonu doğrudan Ayarlar -> Fırat sekmesini açar
+  const sidebarFiratBtn = document.getElementById('sidebar-firat-btn');
+  if (sidebarFiratBtn) {
+    sidebarFiratBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      switchDashboardPage(navSettingsBtn, pageSettings);
+      const firatTabBtn = document.querySelector('.tab-btn[data-tab="tab-firat"]');
+      if (firatTabBtn) firatTabBtn.click();
+    });
+  }
+
   if (navSantiyeBtn) {
     navSantiyeBtn.addEventListener('click', () => {
       switchDashboardPage(navSantiyeBtn, pageSantiye);

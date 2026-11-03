@@ -15,7 +15,7 @@ export async function checkAllSessions() {
   try {
     if (typeof chrome !== 'undefined' && chrome?.storage?.local) {
       storageData = await new Promise(r =>
-        chrome.storage.local.get(['enderyapi_token', 'akyuz_token', 'duzmetal_token', 'session_SITE_A', 'session_SITE_C', 'session_SITE_D', 'session_SITE_E', 'session_SITE_H', 'session_SITE_I', 'session_SITE_J', 'session_SITE_K'], r)
+        chrome.storage.local.get(['enderyapi_token', 'akyuz_token', 'duzmetal_token', 'session_SITE_A', 'session_SITE_C', 'session_SITE_E', 'session_SITE_H', 'session_SITE_I', 'session_SITE_J', 'session_SITE_K'], r)
       ) || {};
     }
   } catch (err) {
@@ -39,16 +39,6 @@ export async function checkAllSessions() {
     updateStatusIndicator('SITE_C',
       storageData.session_SITE_C ? 'success' : 'idle',
       storageData.session_SITE_C ? 'Aktif' : 'Pasif'
-    );
-  }
-
-  const isSiteDChecked = document.getElementById('site-d-check')?.checked;
-  if (!isSiteDChecked) {
-    updateStatusIndicator('SITE_D', 'idle', 'Devre Dışı');
-  } else {
-    updateStatusIndicator('SITE_D',
-      storageData.session_SITE_D ? 'success' : 'idle',
-      storageData.session_SITE_D ? 'Aktif' : 'Pasif'
     );
   }
 
@@ -145,13 +135,10 @@ export async function executeSearch() {
   if (document.getElementById('site-b-check').checked) activeSites.push('SITE_B');
   else updateStatusIndicator('SITE_B', 'idle', 'Devre Dışı');
 
-  if (document.getElementById('site-c-check').checked) activeSites.push('SITE_C');
+  if (document.getElementById('site-c-check')?.checked) activeSites.push('SITE_C');
   else updateStatusIndicator('SITE_C', 'idle', 'Devre Dışı');
 
-  if (document.getElementById('site-d-check').checked) activeSites.push('SITE_D');
-  else updateStatusIndicator('SITE_D', 'idle', 'Devre Dışı');
-
-  if (document.getElementById('site-e-check').checked) activeSites.push('SITE_E');
+  if (document.getElementById('site-e-check')?.checked) activeSites.push('SITE_E');
   else updateStatusIndicator('SITE_E', 'idle', 'Devre Dışı');
 
   if (document.getElementById('site-f-check').checked) activeSites.push('SITE_F');

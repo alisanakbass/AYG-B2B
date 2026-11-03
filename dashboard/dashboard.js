@@ -88,7 +88,6 @@ async function loadSettings() {
       margin_site_a: 40,
       margin_site_b: 40,
       margin_site_c: 40,
-      margin_site_d: 40,
       margin_site_e: 40,
       margin_site_f: 40,
       margin_site_h: 40,
@@ -98,7 +97,6 @@ async function loadSettings() {
       discount_site_a: 0,
       discount_site_b: 0,
       discount_site_c: 0,
-      discount_site_d: 0,
       discount_site_e: 0,
       discount_site_f: 0,
       discount_site_h: 0,
@@ -108,7 +106,6 @@ async function loadSettings() {
       'site-a-check': true,
       'site-b-check': true,
       'site-c-check': false,
-      'site-d-check': false,
       'site-e-check': true,
       'site-f-check': true,
       'site-h-check': true,
@@ -118,7 +115,6 @@ async function loadSettings() {
       url_site_a: DEFAULT_URLS.url_site_a,
       url_site_b: DEFAULT_URLS.url_site_b,
       url_site_c: DEFAULT_URLS.url_site_c,
-      url_site_d: DEFAULT_URLS.url_site_d,
       url_site_e: DEFAULT_URLS.url_site_e,
       url_site_h: DEFAULT_URLS.url_site_h,
       url_site_i: DEFAULT_URLS.url_site_i,
@@ -136,8 +132,6 @@ async function loadSettings() {
       cred_company_site_c: "12001451",
       cred_user_site_c: "1",
       cred_pass_site_c: "AYGUNLER",
-      cred_user_site_d: "17183",
-      cred_pass_site_d: "27f4e5d",
       cred_user_site_h: "1340631",
       cred_pass_site_h: "662732",
       cred_company_site_i: "M01A02",
@@ -173,7 +167,6 @@ async function loadSettings() {
         SITE_A: items.margin_site_a,
         SITE_B: items.margin_site_b,
         SITE_C: items.margin_site_c,
-        SITE_D: items.margin_site_d,
         SITE_E: items.margin_site_e,
         SITE_F: items.margin_site_f,
         SITE_H: items.margin_site_h,
@@ -185,7 +178,6 @@ async function loadSettings() {
         SITE_A: items.discount_site_a,
         SITE_B: items.discount_site_b,
         SITE_C: items.discount_site_c,
-        SITE_D: items.discount_site_d,
         SITE_E: items.discount_site_e,
         SITE_F: items.discount_site_f,
         SITE_H: items.discount_site_h,
@@ -212,7 +204,7 @@ async function loadSettings() {
       const modalMargin = document.getElementById('modal-margin');
       if (modalMargin) modalMargin.value = items.margin;
 
-      ['a', 'b', 'c', 'd', 'e', 'f', 'h', 'i', 'j', 'k'].forEach(letter => {
+      ['a', 'b', 'c', 'e', 'f', 'h', 'i', 'j', 'k'].forEach(letter => {
         const key = `SITE_${letter.toUpperCase()}`;
         const mInput = document.getElementById(`margin-site-${letter}`);
         const dInput = document.getElementById(`discount-site-${letter}`);
@@ -228,7 +220,6 @@ async function loadSettings() {
       const modalUrlA = document.getElementById('modal-url-site-a');
       const modalUrlB = document.getElementById('modal-url-site-b');
       const modalUrlC = document.getElementById('modal-url-site-c');
-      const modalUrlD = document.getElementById('modal-url-site-d');
       const modalUrlE = document.getElementById('modal-url-site-e');
       const modalUrlH = document.getElementById('modal-url-site-h');
       const modalUrlI = document.getElementById('modal-url-site-i');
@@ -237,7 +228,6 @@ async function loadSettings() {
       if (modalUrlA) modalUrlA.value = items.url_site_a;
       if (modalUrlB) modalUrlB.value = items.url_site_b;
       if (modalUrlC) modalUrlC.value = items.url_site_c;
-      if (modalUrlD) modalUrlD.value = items.url_site_d;
       if (modalUrlE) modalUrlE.value = items.url_site_e;
       if (modalUrlH) modalUrlH.value = items.url_site_h;
       if (modalUrlI) modalUrlI.value = items.url_site_i;
@@ -252,8 +242,6 @@ async function loadSettings() {
       const cCompC = document.getElementById('cred-company-site-c');
       const cUserC = document.getElementById('cred-user-site-c');
       const cPassC = document.getElementById('cred-pass-site-c');
-      const cUserD = document.getElementById('cred-user-site-d');
-      const cPassD = document.getElementById('cred-pass-site-d');
       const cUserH = document.getElementById('cred-user-site-h');
       const cPassH = document.getElementById('cred-pass-site-h');
       const cCompI = document.getElementById('cred-company-site-i');
@@ -272,8 +260,6 @@ async function loadSettings() {
       if (cCompC) cCompC.value = items.cred_company_site_c || "12001451";
       if (cUserC) cUserC.value = items.cred_user_site_c || "1";
       if (cPassC) cPassC.value = items.cred_pass_site_c || "AYGUNLER";
-      if (cUserD) cUserD.value = items.cred_user_site_d || "17183";
-      if (cPassD) cPassD.value = items.cred_pass_site_d || "27f4e5d";
       if (cUserH) cUserH.value = items.cred_user_site_h || "1340631";
       if (cPassH) cPassH.value = items.cred_pass_site_h || "662732";
       if (cCompI) cCompI.value = items.cred_company_site_i || "M01A02";
@@ -412,7 +398,6 @@ function setupUIEventListeners() {
     const urlA = document.getElementById('modal-url-site-a').value.trim();
     const urlB = document.getElementById('modal-url-site-b').value.trim();
     const urlC = document.getElementById('modal-url-site-c').value.trim();
-    const urlD = document.getElementById('modal-url-site-d').value.trim();
     const urlE = document.getElementById('modal-url-site-e').value.trim();
     const urlH = document.getElementById('modal-url-site-h').value.trim();
     const urlI = document.getElementById('modal-url-site-i').value.trim();
@@ -423,7 +408,6 @@ function setupUIEventListeners() {
       url_site_a: urlA,
       url_site_b: urlB,
       url_site_c: urlC,
-      url_site_d: urlD,
       url_site_e: urlE,
       url_site_h: urlH,
       url_site_i: urlI,
@@ -1210,8 +1194,6 @@ function setupUIEventListeners() {
       const compC = document.getElementById('cred-company-site-c').value.trim();
       const userC = document.getElementById('cred-user-site-c').value.trim();
       const passC = document.getElementById('cred-pass-site-c').value.trim();
-      const userD = document.getElementById('cred-user-site-d').value.trim();
-      const passD = document.getElementById('cred-pass-site-d').value.trim();
       const userH = document.getElementById('cred-user-site-h').value.trim();
       const passH = document.getElementById('cred-pass-site-h').value.trim();
       const compI = document.getElementById('cred-company-site-i').value.trim();
@@ -1231,8 +1213,6 @@ function setupUIEventListeners() {
         cred_company_site_c: compC,
         cred_user_site_c: userC,
         cred_pass_site_c: passC,
-        cred_user_site_d: userD,
-        cred_pass_site_d: passD,
         cred_user_site_h: userH,
         cred_pass_site_h: passH,
         cred_company_site_i: compI,

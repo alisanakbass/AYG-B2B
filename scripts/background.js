@@ -4,7 +4,6 @@ const DEFAULT_URLS = {
   SITE_A: "https://b4b.ozkaradenizinsaat.com/search/product/{query}",
   SITE_B: "https://b2b.enderyapi.com.tr/tr/urunler-s-{query}?page=1",
   SITE_C: "https://bayi.yasarteknik.com.tr/YeniSiparisGir.asp?F=Ara&FAdi={query}",
-  SITE_D: "https://yenibayi.polisankansai.com/order/makeordernew?search={query}",
   SITE_E: "https://bayi.akyuztools.com/Search/SearchProduct",
   SITE_H: "https://b2b.kamilturk.com/Arama/_Prbx?q={query}",
   SITE_I: "https://bayi.tokticaret.com.tr/SiparisGir.asp?sayfa=&FAdi={query}&F=Ara&Sirala=varsayilan",
@@ -249,12 +248,11 @@ async function triggerNativeUpdate() {
 // Tüm aktif (işaretli) siteler için otomatik giriş yap
 async function performBackgroundLoginForAll() {
   // Arayüzdeki checkbox durumlarını öğrenmek için storage'dan okuyoruz.
-  // Yaşar Teknik ve Polisan varsayılan olarak kapalıdır.
+  // Yaşar Teknik varsayılan olarak kapalıdır.
   const storage = await new Promise(r => chrome.storage.sync.get({
     'site-a-check': true,
     'site-b-check': true,
     'site-c-check': false,
-    'site-d-check': false,
     'site-e-check': true,
     'site-h-check': true,
     'site-i-check': true,
@@ -267,7 +265,6 @@ async function performBackgroundLoginForAll() {
     { checkKey: 'site-a-check', siteKey: 'SITE_A' },
     { checkKey: 'site-b-check', siteKey: 'SITE_B' },
     { checkKey: 'site-c-check', siteKey: 'SITE_C' },
-    { checkKey: 'site-d-check', siteKey: 'SITE_D' },
     { checkKey: 'site-e-check', siteKey: 'SITE_E' },
     { checkKey: 'site-h-check', siteKey: 'SITE_H' },
     { checkKey: 'site-i-check', siteKey: 'SITE_I' },
@@ -556,8 +553,6 @@ async function performLoginForSite(siteKey, isManual = false) {
     cred_company_site_c: "12001451",
     cred_user_site_c: "1",
     cred_pass_site_c: "AYGUNLER",
-    cred_user_site_d: "17183",
-    cred_pass_site_d: "27f4e5d",
     cred_user_site_h: "1340631",
     cred_pass_site_h: "662732",
     cred_company_site_i: "M01A02",
@@ -575,8 +570,6 @@ async function performLoginForSite(siteKey, isManual = false) {
   if (!creds.cred_company_site_c) creds.cred_company_site_c = "12001451";
   if (!creds.cred_user_site_c) creds.cred_user_site_c = "1";
   if (!creds.cred_pass_site_c) creds.cred_pass_site_c = "AYGUNLER";
-  if (!creds.cred_user_site_d) creds.cred_user_site_d = "17183";
-  if (!creds.cred_pass_site_d) creds.cred_pass_site_d = "27f4e5d";
   if (!creds.cred_user_site_h) creds.cred_user_site_h = "1340631";
   if (!creds.cred_pass_site_h) creds.cred_pass_site_h = "662732";
   if (!creds.cred_company_site_i) creds.cred_company_site_i = "M01A02";
@@ -708,9 +701,6 @@ function autoLoginScriptInPage(siteKey, creds) {
         companyCode = creds.cred_company_site_c;
         username = creds.cred_user_site_c;
         password = creds.cred_pass_site_c;
-      } else if (siteKey === 'SITE_D') {
-        username = creds.cred_user_site_d;
-        password = creds.cred_pass_site_d;
       } else if (siteKey === 'SITE_H') {
         username = creds.cred_user_site_h;
         password = creds.cred_pass_site_h;

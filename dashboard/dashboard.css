@@ -820,7 +820,6 @@ button {
 .filter-btn .site-dot.site_a { background: #c084fc; }
 .filter-btn .site-dot.site_b { background: #60a5fa; }
 .filter-btn .site-dot.site_c { background: #fbbf24; }
-.filter-btn .site-dot.site_d { background: #f472b6; }
 .filter-btn .site-dot.site_e { background: #10b981; }
 .filter-btn .site-dot.site_h { background: #818cf8; }
 .filter-btn .site-dot.site_i { background: #f97316; }
@@ -963,10 +962,6 @@ button {
   color: #fbbf24;
 }
 
-.source-badge.site_d {
-  background: rgba(236, 72, 153, 0.12);
-  color: #f472b6;
-}
 
 .source-badge.site_e {
   background: rgba(16, 185, 129, 0.12);

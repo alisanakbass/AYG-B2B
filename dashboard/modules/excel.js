@@ -191,7 +191,7 @@ export async function loadDefaultExcelIfEmpty() {
         if (parsedProducts.length > 0) {
           chrome.storage.local.set({
             firatBoruList: parsedProducts,
-            firatLastUpdate: "20 HAZİRAN 2026 (Varsayılan)"
+            firatLastUpdate: "25 EKİM 2026 (Varsayılan)"
           }, () => {
             console.log(`[B2B Fırat] Varsayılan Excel başarıyla yüklendi: ${parsedProducts.length} ürün.`);
             resolve();
@@ -207,8 +207,194 @@ export async function loadDefaultExcelIfEmpty() {
   });
 }
 
+// PDF Linkinden Fırat Boru Fiyatlarını Otomatik Güncelleyen Fonksiyon
+export async function updateFiratFromPdfUrl(pdfUrl) {
+  const statusEl = document.getElementById('firat-pdf-status');
+  const btn = document.getElementById('update-firat-pdf-btn');
+
+  const setStatus = (msg, type = 'info') => {
+    if (!statusEl) return;
+    statusEl.style.display = 'block';
+    if (type === 'loading') {
+      statusEl.style.background = 'rgba(59, 130, 246, 0.1)';
+      statusEl.style.color = '#3b82f6';
+    } else if (type === 'success') {
+      statusEl.style.background = 'rgba(16, 185, 129, 0.1)';
+      statusEl.style.color = '#10b981';
+    } else {
+      statusEl.style.background = 'rgba(239, 68, 68, 0.1)';
+      statusEl.style.color = '#ef4444';
+    }
+    statusEl.textContent = msg;
+  };
+
+  try {
+    if (!pdfUrl || !pdfUrl.trim().startsWith('http')) {
+      alert("Lütfen geçerli bir PDF linki girin.");
+      return;
+    }
+
+    if (btn) btn.disabled = true;
+    setStatus('PDF dosyası indiriliyor, lütfen bekleyin...', 'loading');
+
+    const res = await fetch(pdfUrl.trim());
+    if (!res.ok) throw new Error(`PDF indirilemedi (HTTP ${res.status})`);
+
+    setStatus('PDF indirildi, sayfalar taranıyor...', 'loading');
+    const arrayBuffer = await res.arrayBuffer();
+    const data = new Uint8Array(arrayBuffer);
+
+    if (typeof window.pdfjsLib === 'undefined') {
+      throw new Error("PDF okuyucu kütüphanesi yüklenemedi.");
+    }
+    if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = typeof chrome !== 'undefined' && chrome.runtime?.getURL 
+        ? chrome.runtime.getURL("lib/pdf.worker.min.js") 
+        : "../lib/pdf.worker.min.js";
+    }
+
+    const doc = await window.pdfjsLib.getDocument({ data }).promise;
+    const pdfPrices = new Map();
+    let detectedDate = '';
+
+    for (let p = 1; p <= doc.numPages; p++) {
+      if (p % 5 === 0 || p === doc.numPages) {
+        setStatus(`Sayfalar taranıyor (${p}/${doc.numPages})...`, 'loading');
+      }
+      const page = await doc.getPage(p);
+      const tc = await page.getTextContent();
+
+      if (!detectedDate) {
+        const fullText = tc.items.map(it => it.str).join(' ');
+        const dateMatch = fullText.match(/(\d{1,2}\s+[A-ZÇĞİÖŞÜa-zçğıöşü]+\s+\d{4})\s+FIRAT\s+BORU/i);
+        if (dateMatch) detectedDate = dateMatch[1];
+      }
+
+      const lineMap = new Map();
+      for (const it of tc.items) {
+        const s = it.str.trim();
+        if (!s) continue;
+        const y = Math.round(it.transform[5]);
+        let foundY = null;
+        for (const k of lineMap.keys()) {
+          if (Math.abs(k - y) <= 3) { foundY = k; break; }
+        }
+        if (foundY === null) { foundY = y; lineMap.set(y, []); }
+        lineMap.get(foundY).push({ x: Math.round(it.transform[4]), str: s });
+      }
+
+      for (const y of lineMap.keys()) {
+        const row = lineMap.get(y).sort((a,b) => a.x - b.x).map(i => i.str);
+        for (let i = 0; i < Math.min(3, row.length); i++) {
+          if (/^[0-9][0-9A-Z]{8,11}$/i.test(row[i])) {
+            const code = row[i];
+            const price = parsePrice(row[row.length - 1]);
+            if (price > 0) pdfPrices.set(code, price);
+            break;
+          }
+        }
+      }
+    }
+
+    if (pdfPrices.size === 0) {
+      throw new Error("PDF dosyasından geçerli fiyat veya ürün kodu okunamadı.");
+    }
+
+    setStatus(`Fiyatlar veritabanına işleniyor (${pdfPrices.size} fiyat bulundu)...`, 'loading');
+
+    // Mevcut listeyi al ve güncelle
+    chrome.storage.local.get(['firatBoruList'], async (storageRes) => {
+      let list = storageRes.firatBoruList || [];
+      
+      // Eğer yerel liste henüz yoksa varsayılan excel'i oku
+      if (list.length === 0) {
+        try {
+          const fileUrl = chrome.runtime.getURL("data/ADANA 20 HAZİRAN 2026 BORU FİYAT LİSTESİ.xlsx");
+          const exRes = await fetch(fileUrl);
+          if (exRes.ok) {
+            const exAb = await exRes.arrayBuffer();
+            const wb = XLSX.read(new Uint8Array(exAb), { type: 'array' });
+            const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+            for (let i = 4; i < rows.length; i++) {
+              const r = rows[i];
+              if (!r || !r[1] || !r[3]) continue;
+              const code = r[1].toString().trim();
+              const packaging = r[2] ? r[2].toString().trim() : '';
+              const name = r[3].toString().trim();
+              const price = parseFloat(r[5]) || 0;
+              list.push({
+                code,
+                name: `${name} (${packaging || 'Adet'})`,
+                price,
+                unit: 'ADET',
+                packQuantity: 1,
+                imgUrl: '../logo.png'
+              });
+            }
+          }
+        } catch(e) {
+          console.warn("[Fırat PDF] Varsayılan Excel yüklenemedi:", e);
+        }
+      }
+
+      let updatedCount = 0;
+      if (list.length > 0) {
+        list = list.map(item => {
+          if (item.code && pdfPrices.has(item.code)) {
+            const newPrice = pdfPrices.get(item.code);
+            if (item.price !== newPrice) {
+              updatedCount++;
+              return { ...item, price: newPrice };
+            }
+          }
+          return item;
+        });
+      }
+
+      const dateLabel = detectedDate ? `${detectedDate} (Online PDF)` : new Date().toLocaleDateString('tr-TR') + ' (Online PDF)';
+
+      chrome.storage.local.set({
+        firatBoruList: list,
+        firatLastUpdate: dateLabel
+      }, () => {
+        chrome.storage.sync.set({ firat_pdf_url: pdfUrl.trim() });
+        setStatus(`Başarılı! ${pdfPrices.size} ürünün fiyatı güncellendi (${dateLabel}).`, 'success');
+        loadFiratStats();
+        if (btn) btn.disabled = false;
+        alert(`Fırat Boru fiyatları başarıyla güncellendi!\nListe Tarihi: ${dateLabel}\nİşlenen Fiyat: ${pdfPrices.size}\nGüncellenen Ürün: ${updatedCount || pdfPrices.size}`);
+      });
+    });
+
+  } catch (err) {
+    console.error("[Fırat PDF Güncelleme Hatası]:", err);
+    setStatus(`Hata: ${err.message}`, 'error');
+    if (btn) btn.disabled = false;
+    alert(`Fiyat güncelleme hatası: ${err.message}`);
+  }
+}
+
 // Excel Dosyası Yükleyici Event Listener Tanımlayıcısı
 export function setupExcelListeners() {
+  const pdfInput = document.getElementById('firat-pdf-url-input');
+  const updatePdfBtn = document.getElementById('update-firat-pdf-btn');
+
+  if (pdfInput) {
+    chrome.storage.sync.get({ firat_pdf_url: "https://www.ikierpazarlama.com.tr/fiyat-listeleri/firat_boru_guncel_fiyat_listesi.pdf" }, (res) => {
+      if (res.firat_pdf_url) pdfInput.value = res.firat_pdf_url;
+    });
+  }
+
+  if (updatePdfBtn && pdfInput) {
+    updatePdfBtn.addEventListener('click', () => {
+      const url = pdfInput.value.trim();
+      if (!url) {
+        alert("Lütfen Fırat Boru PDF linkini girin.");
+        return;
+      }
+      updateFiratFromPdfUrl(url);
+    });
+  }
+
   const excelInput = document.getElementById('firat-excel-input');
   const uploadBtn = document.getElementById('upload-excel-btn');
   const uploadStatus = document.getElementById('excel-upload-status');

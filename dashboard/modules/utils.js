@@ -130,7 +130,6 @@ export function getSourceKeyFromDomain(domain) {
   if (domain.includes('ozkaradeniz')) return 'SITE_A';
   if (domain.includes('enderyapi')) return 'SITE_B';
   if (domain.includes('yasarteknik') || domain.includes('yansis')) return 'SITE_C';
-  if (domain.includes('polisankansai') || domain.includes('polisan')) return 'SITE_D';
   if (domain.includes('akyuztools') || domain.includes('akyuz')) return 'SITE_E';
   if (domain.includes('firat') || domain.includes('excel')) return 'SITE_F';
   if (domain.includes('kamilturk')) return 'SITE_H';

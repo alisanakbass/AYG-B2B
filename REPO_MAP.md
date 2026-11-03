@@ -55,9 +55,8 @@ Her firma kendi dosyasında izoledir. Standart arayüz: `{ key, name, badgeClass
 | `SITE_A` | [`site_a_ozkaradeniz.js`](file:///c:/AYG_Prices/dashboard/modules/sites/site_a_ozkaradeniz.js) | Özkaradeniz İnşaat | Sessiz AJAX Login (`/login/login_request`) & POST `/search/get_product_list` API |
 | `SITE_B` | [`site_b_enderyapi.js`](file:///c:/AYG_Prices/dashboard/modules/sites/site_b_enderyapi.js) | Ender Yapı | Bearer Token ile `services/product/get-product-search` API |
 | `SITE_C` | [`site_c_yasarteknik.js`](file:///c:/AYG_Prices/dashboard/modules/sites/site_c_yasarteknik.js) | Yaşar Teknik B2B | HTML Arama & Tablo Kazıma |
-| `SITE_D` | [`site_d_polisan.js`](file:///c:/AYG_Prices/dashboard/modules/sites/site_d_polisan.js) | Polisan Bayi | Elastic Search API + HTML Fallback |
 | `SITE_E` | [`site_e_akyuzler.js`](file:///c:/AYG_Prices/dashboard/modules/sites/site_e_akyuzler.js) | Akyüzler B2B | `/Search/SearchProduct` API |
-| `SITE_F` | [`site_f_firatboru.js`](file:///c:/AYG_Prices/dashboard/modules/sites/site_f_firatboru.js) | Fırat Boru | Yerel Excel Listesi (`state.firatItems`) |
+| `SITE_F` | [`site_f_firatboru.js`](file:///c:/AYG_Prices/dashboard/modules/sites/site_f_firatboru.js) | Fırat Boru | Yerel Veritabanı + Online PDF & Excel Güncelleme |
 | `SITE_H` | [`site_h_kamilturk.js`](file:///c:/AYG_Prices/dashboard/modules/sites/site_h_kamilturk.js) | Kamil Türk B2B | HTML Arama (`.prbx-item`, Net + Kdv Dahil) |
 | `SITE_I` | [`site_i_tokticaret.js`](file:///c:/AYG_Prices/dashboard/modules/sites/site_i_tokticaret.js) | Tok Ticaret B2B | HTML Arama (`tr[id]`, çoklu döviz desteği) |
 | `SITE_J` | [`site_j_duzmetal.js`](file:///c:/AYG_Prices/dashboard/modules/sites/site_j_duzmetal.js) | Düz Metal B2B | Token ile `https://api.duzmetal.com/urun` API |

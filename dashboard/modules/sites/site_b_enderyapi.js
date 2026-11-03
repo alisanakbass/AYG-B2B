@@ -71,7 +71,18 @@ export const siteB = {
     const vatEl = row.querySelector('.taxprice-id, [data-title="KDV"], [data-title*="KDV"]');
     const vatRate = extractVatRate(vatEl?.textContent) || 20;
 
-    return { key, name, basePrice, domain, imgUrl, unit, packQuantity, vatRate };
+    const linkEl = row.querySelector('a.name-id-link, a.row-id, .name-id-link a, a') || (row.tagName === 'A' ? row : null);
+    let productUrl = '';
+    if (linkEl && linkEl.getAttribute('href')) {
+      const href = linkEl.getAttribute('href');
+      productUrl = href.startsWith('http') ? href : `https://b2b.enderyapi.com.tr${href.startsWith('/') ? '' : '/'}${href}`;
+    } else if (codeId) {
+      productUrl = `https://b2b.enderyapi.com.tr/tr/urunler-s-${encodeURIComponent(codeId)}?page=1`;
+    } else {
+      productUrl = `https://b2b.enderyapi.com.tr/tr/urunler-s-${encodeURIComponent(name)}?page=1`;
+    }
+
+    return { key, name, basePrice, domain, imgUrl, productUrl, unit, packQuantity, vatRate };
   },
 
   search: async function (query, isRetry = false) {
@@ -287,6 +298,17 @@ export const siteB = {
             }
           }
 
+          let productUrl = details.ProductUrl || jsonRow.ProductUrl || details.Url || jsonRow.Url || details.WebUrl || jsonRow.WebUrl || details.Link || jsonRow.Link || '';
+          if (productUrl) {
+            if (!productUrl.startsWith('http')) {
+              productUrl = `https://b2b.enderyapi.com.tr${productUrl.startsWith('/') ? '' : '/'}${productUrl}`;
+            }
+          } else if (code) {
+            productUrl = `https://b2b.enderyapi.com.tr/tr/urunler-s-${encodeURIComponent(code)}?page=1`;
+          } else if (name) {
+            productUrl = `https://b2b.enderyapi.com.tr/tr/urunler-s-${encodeURIComponent(name)}?page=1`;
+          }
+
           if (!isNaN(basePrice) && basePrice > 0) {
             state.currentResults.push({
               key,
@@ -295,6 +317,7 @@ export const siteB = {
               purchaseWithVat: basePrice * (1 + (vatRate / 100)),
               domain,
               imgUrl,
+              productUrl,
               sourceKey: siteKey,
               sourceName: siteB.name,
               badgeClass: siteB.badgeClass,

@@ -68,7 +68,16 @@ export const siteH = {
       }
     }
 
-    return { key, name, basePrice, purchaseWithVat, domain, imgUrl, unit: 'ADET', packQuantity: packQuantity || 1, vatRate };
+    const detailLink = row.querySelector('.prbx-ad a, a.prbx-ad, .prbx-image a, a[href*="/Urun/"], a[href*="/Detay/"]') || row.querySelector('a');
+    let productUrl = '';
+    if (detailLink && detailLink.getAttribute('href')) {
+      const href = detailLink.getAttribute('href');
+      productUrl = href.startsWith('http') ? href : ('https://b2b.kamilturk.com' + (href.startsWith('/') ? '' : '/') + href);
+    } else {
+      productUrl = `https://b2b.kamilturk.com/Arama/_Prbx?q=${encodeURIComponent(name)}`;
+    }
+
+    return { key, name, basePrice, purchaseWithVat, domain, imgUrl, productUrl, unit: 'ADET', packQuantity: packQuantity || 1, vatRate };
   },
 
   search: async function (query, isRetry = false) {

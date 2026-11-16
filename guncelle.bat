@@ -1,15 +1,23 @@
 @echo off
 setlocal enabledelayedexpansion
 
-cd /d "%~dp0"
+if not "%~1"=="--temp-run" (
+    copy /y "%~f0" "%TEMP%\ayg_guncelle_runner.bat" >nul
+    call "%TEMP%\ayg_guncelle_runner.bat" --temp-run "%~dp0"
+    exit /b !errorlevel!
+)
+
+set "APP_DIR=%~2"
+if "!APP_DIR!"=="" set "APP_DIR=%~dp0"
+cd /d "!APP_DIR!"
 
 echo ==========================================
 echo    AYG B2B - OTO GUNCELLEME VE SERVIS KUR
 echo ==========================================
 echo.
 
-if exist "%~dp0tools\do_update.ps1" (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\do_update.ps1"
+if exist "!APP_DIR!tools\do_update.ps1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "!APP_DIR!tools\do_update.ps1"
 ) else (
     echo Guncel dosyalar GitHub'dan indiriliyor, lutfen bekleyin...
     powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $wc = New-Object System.Net.WebClient; $wc.Headers.Add('User-Agent', 'Mozilla/5.0'); $wc.DownloadFile('https://github.com/alisanakbass/AYG-B2B/archive/refs/heads/main.zip', 'update.zip'); Expand-Archive -Path 'update.zip' -DestinationPath 'temp_update' -Force; $sub = Get-ChildItem 'temp_update' | Where-Object { $_.PSIsContainer } | Select-Object -First 1; Get-ChildItem -Path $sub.FullName -Recurse | ForEach-Object { $rel = $_.FullName.Substring($sub.FullName.Length + 1); $dest = Join-Path (Get-Location).Path $rel; if ($_.PSIsContainer) { if (-not (Test-Path $dest)) { New-Item -ItemType Directory -Path $dest -Force | Out-Null } } else { Copy-Item -Path $_.FullName -Destination $dest -Force } }; Remove-Item -Force 'update.zip' -ErrorAction SilentlyContinue; Remove-Item -Recurse -Force 'temp_update' -ErrorAction SilentlyContinue"
@@ -25,7 +33,7 @@ if not exist manifest.json (
 )
 
 :: Native Messaging Registry Kaydını Güncelle
-if exist "%~dp0tools\native_kayit.bat" call "%~dp0tools\native_kayit.bat" > nul 2>&1
+if exist "!APP_DIR!tools\native_kayit.bat" call "!APP_DIR!tools\native_kayit.bat" > nul 2>&1
 
 echo.
 echo ==========================================
@@ -60,7 +68,7 @@ if /i "%choice%"=="E" (
         exit /b
     )
 
-    set "SCRIPT_DIR=%~dp0"
+    set "SCRIPT_DIR=!APP_DIR!"
     set "TASK_NAME=B2BEklentiOtomatikGuncelleme"
 
     :: Gorev Zamanlayicisina Gorevi Ekle (Gorev penceresiz calisan oto_guncelle.vbs'yi tetikler)

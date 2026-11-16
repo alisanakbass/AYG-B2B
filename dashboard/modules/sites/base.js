@@ -60,7 +60,7 @@ export async function fetchHtmlSite(siteKey, query, config, isRetry = false) {
                         htmlText.includes('KullaniciKodu') ||
                         !!doc.querySelector('input[type="password"]');
 
-    if (isLoginPage && (siteKey === 'SITE_I' || siteKey === 'SITE_C' || siteKey === 'SITE_K') && !isRetry) {
+    if (isLoginPage && (siteKey === 'SITE_I' || siteKey === 'SITE_C' || siteKey === 'SITE_H' || siteKey === 'SITE_K') && !isRetry) {
       console.log(`[B2B Portal] ${siteKey} (${config.name}) oturumu kapalı tespit edildi! Otomatik arka plan girişi yapılıyor...`);
       updateStatusIndicator(siteKey, 'loading', 'Giriş Yapılıyor...');
 

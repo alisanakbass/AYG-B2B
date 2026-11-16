@@ -356,6 +356,100 @@ async function performLoginForSite(siteKey, isManual = false) {
     console.log("[B2B Background] Öz Karadeniz sessiz giriş başarısız oldu, sekmeli yönteme geçiliyor.");
   }
 
+  if (siteKey === 'SITE_B') {
+    // Ender Yapı için sekme açmadan 2 adımlı API ile sessiz giriş
+    const creds = await new Promise(r => chrome.storage.sync.get({
+      cred_user_site_b: "120 08 1401",
+      cred_pass_site_b: "1401"
+    }, r));
+
+    const email = (creds.cred_user_site_b || "120 08 1401").trim();
+    const password = (creds.cred_pass_site_b || "1401").trim();
+
+    try {
+      console.log(`[B2B Background] Ender Yapı sessiz giriş isteği yapılıyor... Kullanıcı: ${email}`);
+      const clientRes = await fetch("https://b2bstore.com.tr:14501/api/auth/get-tokenbyclient", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Browser-Web-Url": "b2b.enderyapi.com.tr",
+          "LanguageCode": "TR"
+        },
+        body: JSON.stringify({ weburl: "b2b.enderyapi.com.tr", clientsecret: "myclientsecret" })
+      });
+
+      if (clientRes.ok) {
+        const clientData = await clientRes.json();
+        const clientToken = clientData?.Data?.AccessToken || clientData?.AccessToken;
+        if (clientToken) {
+          const userRes = await fetch("https://b2bstore.com.tr:14501/api/auth/get-token", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${clientToken}`,
+              "Browser-Web-Url": "b2b.enderyapi.com.tr",
+              "LanguageCode": "TR"
+            },
+            body: JSON.stringify({ Email: email, Password: password })
+          });
+
+          if (userRes.ok) {
+            const userData = await userRes.json();
+            const userToken = userData?.Data?.token?.AccessToken || userData?.token?.AccessToken;
+            if (userToken) {
+              await new Promise(r => chrome.storage.local.set({ enderyapi_token: userToken }, r));
+              await updateStorageSession('SITE_B', true);
+              console.log("[B2B Background] Ender Yapı sessiz giriş başarılı.");
+              return { success: true, message: "Oturum Sessizce Açıldı" };
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[B2B Background] Ender Yapı sessiz giriş hatası:", err);
+    }
+    console.log("[B2B Background] Ender Yapı sessiz giriş başarısız oldu, sekmeli yönteme geçiliyor.");
+  }
+
+  if (siteKey === 'SITE_H') {
+    // Kamil Türk için sekme açmadan AJAX POST ile sessiz giriş
+    const creds = await new Promise(r => chrome.storage.sync.get({
+      cred_user_site_h: "1340631",
+      cred_pass_site_h: "662732"
+    }, r));
+
+    const username = (creds.cred_user_site_h || "1340631").trim();
+    const password = (creds.cred_pass_site_h || "662732").trim();
+
+    try {
+      console.log(`[B2B Background] Kamil Türk sessiz giriş isteği yapılıyor... Kullanıcı: ${username}`);
+      const loginRes = await fetch("https://b2b.kamilturk.com/Giris", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Accept": "application/json, text/javascript, */*; q=0.01",
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        body: `adi=${encodeURIComponent(username)}&Sifre=${encodeURIComponent(password)}&SmsSifre=&BeniHatirla=true`
+      });
+
+      if (loginRes.ok) {
+        const data = await loginRes.json().catch(() => null);
+        console.log("[B2B Background] Kamil Türk sessiz giriş yanıtı:", data);
+        if (data && data.success) {
+          await updateStorageSession('SITE_H', true);
+          return { success: true, message: "Oturum Sessizce Açıldı" };
+        }
+      } else {
+        console.warn(`[B2B Background] Kamil Türk sessiz giriş HTTP hatası: ${loginRes.status}`);
+      }
+    } catch (err) {
+      console.error("[B2B Background] Kamil Türk sessiz giriş hatası:", err);
+    }
+    console.log("[B2B Background] Kamil Türk sessiz giriş başarısız oldu, sekmeli yönteme geçiliyor.");
+  }
+
   if (siteKey === 'SITE_C') {
     // Yaşar Teknik için sekme açmak yerine önce sessizce arka planda AJAX POST giriş deniyoruz.
     const creds = await new Promise(r => chrome.storage.sync.get({

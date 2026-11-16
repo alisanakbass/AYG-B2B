@@ -93,6 +93,13 @@ export const siteB = {
     const token = storageData.enderyapi_token;
 
     if (!token) {
+      if (!isRetry && typeof chrome !== 'undefined' && chrome?.runtime?.sendMessage) {
+        updateStatusIndicator(siteKey, 'loading', 'Giriş Yapılıyor...');
+        await new Promise(resolve => {
+          chrome.runtime.sendMessage({ action: "manual_login", siteKey }, resolve);
+        });
+        return siteB.search(query, true);
+      }
       updateStatusIndicator(siteKey, 'error', 'Giriş Gerekli');
       return;
     }
@@ -128,6 +135,13 @@ export const siteB = {
       });
 
       if (response.status === 401) {
+        if (!isRetry && typeof chrome !== 'undefined' && chrome?.runtime?.sendMessage) {
+          updateStatusIndicator(siteKey, 'loading', 'Giriş Yapılıyor...');
+          await new Promise(resolve => {
+            chrome.runtime.sendMessage({ action: "manual_login", siteKey }, resolve);
+          });
+          return siteB.search(query, true);
+        }
         throw new Error("Yetkilendirme Hatası (Oturum Kapatılmış)");
       }
       if (!response.ok) throw new Error(`HTTP Hata: ${response.status}`);

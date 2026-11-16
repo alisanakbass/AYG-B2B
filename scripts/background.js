@@ -1,7 +1,7 @@
 // B2B Karşılaştırma Portalı Arka Plan Servis Scripti (Service Worker)
 
 const DEFAULT_URLS = {
-  SITE_A: "https://b4b.ozkaradenizinsaat.com/search/product/{query}",
+  SITE_A: "https://b2b.ozkaradeniz.tr/products?q={query}",
   SITE_B: "https://b2b.enderyapi.com.tr/tr/urunler-s-{query}?page=1",
   SITE_C: "https://bayi.yasarteknik.com.tr/YeniSiparisGir.asp?F=Ara&FAdi={query}",
   SITE_E: "https://bayi.akyuztools.com/Search/SearchProduct",
@@ -287,35 +287,66 @@ async function performBackgroundLoginForAll() {
 async function performLoginForSite(siteKey, isManual = false) {
 
   if (siteKey === 'SITE_A') {
-    // Öz Karadeniz için sekme açmak yerine doğrudan arka planda AJAX POST ile sessiz giriş
+    // Öz Karadeniz (yeni b2b.ozkaradeniz.tr) için önce refresh token dene, yoksa /api/v1/auth/login ile sessiz giriş
     const creds = await new Promise(r => chrome.storage.sync.get({
       cred_user_site_a: "info@aygunleryapi.com",
-      cred_pass_site_a: "FZ0DT1YL*0OE"
+      cred_pass_site_a: "Aygün123"
     }, r));
 
-    const email = creds.cred_user_site_a || "info@aygunleryapi.com";
-    const password = creds.cred_pass_site_a || "FZ0DT1YL*0OE";
+    const email = (creds.cred_user_site_a || "info@aygunleryapi.com").trim();
+    let password = (creds.cred_pass_site_a || "Aygün123").trim();
+    if (password === "FZ0DT1YL*0OE") {
+      password = "Aygün123";
+      chrome.storage.sync.set({ cred_pass_site_a: "Aygün123" });
+    }
+
+    try {
+      // 1. Önce mevcut 30 günlük refresh token varsa sessizce yenile (rate-limit'e takılmaz)
+      const refreshRes = await fetch("https://b2b.ozkaradeniz.tr/api/v1/auth/refresh", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Accept": "application/json" }
+      });
+
+      if (refreshRes.ok) {
+        const refreshData = await refreshRes.json().catch(() => ({}));
+        if (refreshData && refreshData.success) {
+          console.log("[B2B Background] Öz Karadeniz token refresh ile tazelendi.");
+          await updateStorageSession('SITE_A', true);
+          return { success: true, message: "Oturum Tazelendi" };
+        }
+      }
+    } catch (e) {
+      // Refresh başarısız olursa login'e geç
+    }
 
     try {
       console.log(`[B2B Background] Öz Karadeniz sessiz giriş isteği yapılıyor... E-posta: ${email}`);
-      const loginRes = await fetch("https://b4b.ozkaradenizinsaat.com/login/login_request", {
+      const loginRes = await fetch("https://b2b.ozkaradeniz.tr/api/v1/auth/login", {
         method: "POST",
         credentials: "include",
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "X-Requested-With": "XMLHttpRequest"
+          "Content-Type": "application/json",
+          "Accept": "application/json"
         },
-        body: `mail=${encodeURIComponent(email.trim())}&password=${encodeURIComponent(password.trim())}&remember=true`
+        body: JSON.stringify({
+          email: email,
+          pass: password,
+          portal: "customer"
+        })
       });
 
       if (loginRes.ok) {
         const data = await loginRes.json();
         console.log(`[B2B Background] Öz Karadeniz sessiz giriş yanıtı:`, data);
-        if (data && data.result) {
+        if (data && data.success) {
           console.log("[B2B Background] Öz Karadeniz sessiz giriş başarılı.");
           await updateStorageSession('SITE_A', true);
           return { success: true, message: "Oturum Sessizce Açıldı" };
         }
+      } else if (loginRes.status === 429) {
+        console.warn("[B2B Background] Öz Karadeniz giriş hız limiti (429).");
+        return { success: false, message: "Çok fazla deneme (1 dk bekleyin)" };
       } else {
         console.warn(`[B2B Background] Öz Karadeniz sessiz giriş HTTP hatası: ${loginRes.status} ${loginRes.statusText}`);
       }
@@ -547,7 +578,7 @@ async function performLoginForSite(siteKey, isManual = false) {
   // Giriş bilgilerini sync storage'dan oku
   const creds = await new Promise(r => chrome.storage.sync.get({
     cred_user_site_a: "info@aygunleryapi.com",
-    cred_pass_site_a: "FZ0DT1YL*0OE",
+    cred_pass_site_a: "Aygün123",
     cred_user_site_b: "120 08 1401",
     cred_pass_site_b: "1401",
     cred_company_site_c: "12001451",
@@ -564,7 +595,7 @@ async function performLoginForSite(siteKey, isManual = false) {
 
   // Eğer sync storage'da boş string olarak kayıtlıysa varsayılan değerleri atayalım
   if (!creds.cred_user_site_a) creds.cred_user_site_a = "info@aygunleryapi.com";
-  if (!creds.cred_pass_site_a) creds.cred_pass_site_a = "FZ0DT1YL*0OE";
+  if (!creds.cred_pass_site_a || creds.cred_pass_site_a === "FZ0DT1YL*0OE") creds.cred_pass_site_a = "Aygün123";
   if (!creds.cred_user_site_b) creds.cred_user_site_b = "120 08 1401";
   if (!creds.cred_pass_site_b) creds.cred_pass_site_b = "1401";
   if (!creds.cred_company_site_c) creds.cred_company_site_c = "12001451";

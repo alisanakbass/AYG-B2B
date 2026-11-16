@@ -72,20 +72,46 @@ export const siteA = {
     updateStatusIndicator(siteKey, 'loading', isRetry ? 'Yeniden Deneniyor...' : 'Aranıyor...');
 
     try {
-      const searchUrl = await getSearchUrl(siteKey, query);
-      const domain = new URL(searchUrl).hostname;
-      const origin = new URL(searchUrl).origin;
-      const apiUrl = `${origin}/search/get_product_list`;
+      let searchUrl = await getSearchUrl(siteKey, query);
+      if (searchUrl.includes('b4b.ozkaradenizinsaat.com')) {
+        searchUrl = `https://b2b.ozkaradeniz.tr/products?q=${encodeURIComponent(query)}`;
+      }
+      const urlObj = new URL(searchUrl);
+      const domain = urlObj.hostname;
+      const origin = urlObj.origin;
+      const apiUrl = `${origin}/api/v1/products/search?q=${encodeURIComponent(query)}`;
 
       const response = await fetch(apiUrl, {
-        method: 'POST',
+        method: 'GET',
         credentials: 'include',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
           'Accept': 'application/json, text/plain, */*'
-        },
-        body: `type=product&parameter=${encodeURIComponent(query)}&search=&query_string=`
+        }
       });
+
+      if (response.status === 401 && !isRetry) {
+        // Önce 30 günlük refresh token ile sessizce token yenile (rate-limit'e takılmaz)
+        let refreshed = false;
+        try {
+          const refreshRes = await fetch(`${origin}/api/v1/auth/refresh`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Accept': 'application/json' }
+          });
+          if (refreshRes.ok) {
+            const refreshData = await refreshRes.json().catch(() => ({}));
+            if (refreshData && refreshData.success) refreshed = true;
+          }
+        } catch (e) { /* ignore */ }
+
+        if (!refreshed && typeof chrome !== 'undefined' && chrome?.runtime?.sendMessage) {
+          updateStatusIndicator(siteKey, 'loading', 'Giriş Yapılıyor...');
+          await new Promise(resolve => {
+            chrome.runtime.sendMessage({ action: "manual_login", siteKey: siteKey }, resolve);
+          });
+        }
+        return siteA.search(query, true);
+      }
 
       if (!response.ok) throw new Error(`HTTP Hata: ${response.status}`);
 
@@ -97,70 +123,52 @@ export const siteA = {
         throw new Error("API yanıtı JSON formatında değil.");
       }
 
-      const list = (data.data && data.data.list) || data.list || [];
+      const list = Array.isArray(data.data) ? data.data : (data.list || []);
       let itemsFoundCount = 0;
 
       list.forEach(jsonRow => {
         try {
-          const name = jsonRow.c || 'Bilinmeyen Ürün';
-          const code = jsonRow.b || jsonRow.b0 || '';
+          const name = jsonRow.name || 'Bilinmeyen Ürün';
+          const code = jsonRow.sku || jsonRow.id || '';
+          const pricing = jsonRow.pricing || {};
+          const vatRate = extractVatRate(pricing.vatRate ?? jsonRow.vatRate) || 20;
 
           let basePrice = NaN;
-          if (jsonRow.j) {
-            basePrice = parsePrice(jsonRow.j.toString());
-          } else if (jsonRow.a1 && jsonRow.a1.TL && jsonRow.a1.TL.net_price_raw) {
-            basePrice = jsonRow.a1.TL.net_price_raw;
-          } else if (jsonRow.g) {
-            basePrice = parsePrice(jsonRow.g.toString());
-          }
-
-          const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
-          const key = `b2b_${domain.replace(/\./g, '_')}_${jsonRow.a || cleanName}`;
-
-          let imgUrl = '';
-          if (jsonRow.o && jsonRow.o.length > 0) {
-            const val = jsonRow.o[0];
-            const imgPath = val.a || '';
-            const imgType = val.b;
-
-            let baseUrl = 'https://d1y8qveuwztoxr.cloudfront.net/b2b_ozkaradeniz/';
-            if (imgType == 3) {
-              baseUrl = 'https://b4b.ozkaradenizinsaat.com/upload/ext_image/';
-            } else if (imgType == 2) {
-              baseUrl = 'https://d1y8qveuwztoxr.cloudfront.net/_NAT/';
-            }
-
-            imgUrl = `${baseUrl}${imgPath}`;
-          }
-
-          let vatRate = extractVatRate(jsonRow.i);
           let purchaseWithVat = 0;
-          if (jsonRow.a1 && jsonRow.a1.TL) {
-            const tl = jsonRow.a1.TL;
-            vatRate = vatRate || extractVatRate(tl.tax_rate) || extractVatRate(tl.vat_rate) || extractVatRate(tl.kdv);
-            if (tl.purchase_price_raw && Number(tl.purchase_price_raw) > 0) {
-              purchaseWithVat = Number(tl.purchase_price_raw);
+
+          if (pricing.tl && pricing.tl.netPrice != null) {
+            basePrice = Number(pricing.tl.netPrice);
+            if (pricing.tl.netPriceWithVat != null) {
+              purchaseWithVat = Number(pricing.tl.netPriceWithVat);
             }
-            if (!vatRate && tl.purchase_price_raw && tl.net_price_raw && tl.net_price_raw > 0) {
-              const calc = Math.round(((tl.purchase_price_raw / tl.net_price_raw) - 1) * 100);
-              if (calc > 0 && calc <= 100) vatRate = calc;
+          } else if (pricing.netPrice != null) {
+            basePrice = Number(pricing.netPrice);
+            if (pricing.netPriceWithVat != null) {
+              purchaseWithVat = Number(pricing.netPriceWithVat);
             }
+            const curr = (jsonRow.currency || 'TRY').toUpperCase();
+            if (curr === 'USD' && state.exchangeRates.USD) {
+              basePrice *= state.exchangeRates.USD;
+              purchaseWithVat *= state.exchangeRates.USD;
+            } else if (curr === 'EUR' && state.exchangeRates.EUR) {
+              basePrice *= state.exchangeRates.EUR;
+              purchaseWithVat *= state.exchangeRates.EUR;
+            }
+          } else if (jsonRow.price != null) {
+            basePrice = Number(jsonRow.price);
           }
-          vatRate = vatRate || 20;
+
           if (!purchaseWithVat && basePrice > 0) {
             purchaseWithVat = basePrice * (1 + (vatRate / 100));
           }
 
-          let productUrl = '';
-          if (jsonRow.url) {
-            productUrl = jsonRow.url.startsWith('http') ? jsonRow.url : `${origin}${jsonRow.url.startsWith('/') ? '' : '/'}${jsonRow.url}`;
-          } else if (jsonRow.link) {
-            productUrl = jsonRow.link.startsWith('http') ? jsonRow.link : `${origin}${jsonRow.link.startsWith('/') ? '' : '/'}${jsonRow.link}`;
-          } else if (code) {
-            productUrl = `${origin}/search/product/${encodeURIComponent(code)}`;
-          } else if (name && name !== 'Bilinmeyen Ürün') {
-            productUrl = `${origin}/search/product/${encodeURIComponent(name)}`;
-          }
+          const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
+          const key = `b2b_${domain.replace(/\./g, '_')}_${jsonRow.id || code || cleanName}`;
+
+          const imgUrl = (jsonRow.image && (jsonRow.image.thumbUrl || jsonRow.image.detailUrl)) || '';
+          const productUrl = code
+            ? `${origin}/products/${encodeURIComponent(code)}`
+            : `${origin}/products?q=${encodeURIComponent(name)}`;
 
           if (!isNaN(basePrice) && basePrice > 0) {
             const parsedPackQty = parsePackQuantityFromName(name);
@@ -168,7 +176,7 @@ export const siteA = {
               key,
               name,
               itemCode: code,
-              basePrice: basePrice,
+              basePrice,
               purchaseWithVat,
               domain,
               imgUrl,
@@ -176,9 +184,9 @@ export const siteA = {
               sourceKey: siteKey,
               sourceName: siteA.name,
               badgeClass: siteA.badgeClass,
-              unit: parsedPackQty ? 'PAKET' : 'ADET',
+              unit: parsedPackQty ? 'PAKET' : (jsonRow.unit ? jsonRow.unit.toUpperCase() : 'ADET'),
               packQuantity: parsedPackQty || 1,
-              vatRate: vatRate || 20
+              vatRate
             });
             itemsFoundCount++;
           }

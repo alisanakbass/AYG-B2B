@@ -29,7 +29,7 @@ export const state = {
 
 // Varsayılan B2B Arama Şablonları
 export const DEFAULT_URLS = {
-  url_site_a: "https://b4b.ozkaradenizinsaat.com/search/product/{query}",
+  url_site_a: "https://b2b.ozkaradeniz.tr/products?q={query}",
   url_site_b: "https://b2b.enderyapi.com.tr/tr/urunler-s-{query}?page=1",
   url_site_c: "https://bayi.yasarteknik.com.tr/YeniSiparisGir.asp?F=Ara&FAdi={query}",
   url_site_e: "https://bayi.akyuztools.com/Search/SearchProduct",

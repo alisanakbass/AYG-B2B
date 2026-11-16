@@ -126,7 +126,7 @@ async function loadSettings() {
       marginMode: 'tiered',
       tieredMargins: [],
       cred_user_site_a: "info@aygunleryapi.com",
-      cred_pass_site_a: "FZ0DT1YL*0OE",
+      cred_pass_site_a: "Aygün123",
       cred_user_site_b: "120 08 1401",
       cred_pass_site_b: "1401",
       cred_company_site_c: "12001451",
@@ -225,6 +225,15 @@ async function loadSettings() {
       const modalUrlI = document.getElementById('modal-url-site-i');
       const modalUrlJ = document.getElementById('modal-url-site-j');
       const modalUrlK = document.getElementById('modal-url-site-k');
+      if (items.url_site_a && items.url_site_a.includes('b4b.ozkaradenizinsaat.com')) {
+        items.url_site_a = DEFAULT_URLS.url_site_a;
+        chrome.storage.sync.set({ url_site_a: DEFAULT_URLS.url_site_a });
+      }
+      if (items.cred_pass_site_a === "FZ0DT1YL*0OE") {
+        items.cred_pass_site_a = "Aygün123";
+        chrome.storage.sync.set({ cred_pass_site_a: "Aygün123" });
+      }
+
       if (modalUrlA) modalUrlA.value = items.url_site_a;
       if (modalUrlB) modalUrlB.value = items.url_site_b;
       if (modalUrlC) modalUrlC.value = items.url_site_c;
@@ -254,7 +263,7 @@ async function loadSettings() {
       const cPassK = document.getElementById('cred-pass-site-k');
 
       if (cUserA) cUserA.value = items.cred_user_site_a || "info@aygunleryapi.com";
-      if (cPassA) cPassA.value = items.cred_pass_site_a || "FZ0DT1YL*0OE";
+      if (cPassA) cPassA.value = items.cred_pass_site_a || "Aygün123";
       if (cUserB) cUserB.value = items.cred_user_site_b || "120 08 1401";
       if (cPassB) cPassB.value = items.cred_pass_site_b || "1401";
       if (cCompC) cCompC.value = items.cred_company_site_c || "12001451";

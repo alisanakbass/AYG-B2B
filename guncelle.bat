@@ -1,39 +1,37 @@
 @echo off
 setlocal enabledelayedexpansion
 
-if not "%~1"=="--temp-run" (
-    copy /y "%~f0" "%TEMP%\ayg_guncelle_runner.bat" >nul
-    call "%TEMP%\ayg_guncelle_runner.bat" --temp-run "%~dp0"
-    exit /b !errorlevel!
-)
-
-set "APP_DIR=%~2"
-if "!APP_DIR!"=="" set "APP_DIR=%~dp0"
-cd /d "!APP_DIR!"
+cd /d "%~dp0"
 
 echo ==========================================
-echo    AYG B2B - OTO GUNCELLEME VE SERVIS KUR
+echo    AYG B2B - GUNCELLEME VE SERVIS KURULUMU
 echo ==========================================
 echo.
+echo Guncel dosyalar GitHub'dan indiriliyor, lutfen bekleyin...
 
-if exist "!APP_DIR!tools\do_update.ps1" (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "!APP_DIR!tools\do_update.ps1"
-) else (
-    echo Guncel dosyalar GitHub'dan indiriliyor, lutfen bekleyin...
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $wc = New-Object System.Net.WebClient; $wc.Headers.Add('User-Agent', 'Mozilla/5.0'); $wc.DownloadFile('https://github.com/alisanakbass/AYG-B2B/archive/refs/heads/main.zip', 'update.zip'); Expand-Archive -Path 'update.zip' -DestinationPath 'temp_update' -Force; $sub = Get-ChildItem 'temp_update' | Where-Object { $_.PSIsContainer } | Select-Object -First 1; Get-ChildItem -Path $sub.FullName -Recurse | ForEach-Object { $rel = $_.FullName.Substring($sub.FullName.Length + 1); $dest = Join-Path (Get-Location).Path $rel; if ($_.PSIsContainer) { if (-not (Test-Path $dest)) { New-Item -ItemType Directory -Path $dest -Force | Out-Null } } else { Copy-Item -Path $_.FullName -Destination $dest -Force } }; Remove-Item -Force 'update.zip' -ErrorAction SilentlyContinue; Remove-Item -Recurse -Force 'temp_update' -ErrorAction SilentlyContinue"
-)
+curl.exe -L -s -o update.zip "https://github.com/alisanakbass/AYG-B2B/archive/refs/heads/main.zip"
 
-if not exist manifest.json (
+if not exist update.zip (
     echo.
-    echo ❌ HATA: Guncelleme paketi indirilemedi veya dosyalar acilamadi!
-    echo Lutfen internet baglantinizi ve GitHub baglantinizi kontrol edin.
+    echo HATA: Guncelleme paketi indirilemedi! Internet baglantinizi kontrol edin.
     echo.
     pause
     exit /b
 )
 
-:: Native Messaging Registry Kaydını Güncelle
-if exist "!APP_DIR!tools\native_kayit.bat" call "!APP_DIR!tools\native_kayit.bat" > nul 2>&1
+echo Dosyalar aciliyor ve kopyalaniyor...
+tar -xf update.zip --strip-components=1 --exclude="*/guncelle.bat" --exclude="guncelle.bat"
+del /f /q update.zip >nul 2>&1
+
+if not exist manifest.json (
+    echo.
+    echo HATA: Guncelleme paketi acilamadi!
+    echo.
+    pause
+    exit /b
+)
+
+if exist "%~dp0tools\native_kayit.bat" call "%~dp0tools\native_kayit.bat" > nul 2>&1
 
 echo.
 echo ==========================================
@@ -41,48 +39,45 @@ echo    GUNCELLEME BASARIYLA TAMAMLANDI!
 echo ==========================================
 echo.
 echo Eklenti dosyalari guncellendi.
-echo Lutfen Chrome tarayicinizda chrome://extensions adresine gidip eklentiyi YENILE (Refresh) yapin.
+echo Chrome tarayicinizda chrome://extensions sayfasindan eklentiyi YENILE yapin.
 echo.
 echo ------------------------------------------
 echo.
 
-:: SERVIS KURULUM AŞAMASI
-set /p choice="Her 15 dakikada bir otomatik guncelleme yapacak Windows Servisini kurmak ister misiniz? [E/H]: "
+set /p choice="Her 15 dakikada bir otomatik guncelleme servisi kurulsun mu? [E/H]: "
 
 if /i "%choice%"=="E" (
     echo.
     echo Servis kurulumu baslatiliyor...
     echo.
 
-    :: Yonetici yetkisi kontrolu
     net session >nul 2>&1
     if !errorLevel! neq 0 (
         echo =====================================================
-        echo ⚠️ UYARI: Servis kurulumu icin YONETICI YETKISI gerekiyor!
+        echo UYARI: Servis kurulumu icin YONETICI YETKISI gerekiyor!
         echo.
-        echo Lutfen bu 'guncelle.bat' dosyasina SAG TIKLAYIP 
-        echo 'Yonetici Olarak Calistir' secenegiyle acin ve tekrar deneyin.
+        echo Lutfen 'guncelle.bat' dosyasina SAG TIKLAYIP
+        echo 'Yonetici Olarak Calistir' secenegiyle acin.
         echo =====================================================
         echo.
         pause
         exit /b
     )
 
-    set "SCRIPT_DIR=!APP_DIR!"
+    set "SCRIPT_DIR=%~dp0"
     set "TASK_NAME=B2BEklentiOtomatikGuncelleme"
 
-    :: Gorev Zamanlayicisina Gorevi Ekle (Gorev penceresiz calisan oto_guncelle.vbs'yi tetikler)
     schtasks /create /tn "!TASK_NAME!" /tr "wscript.exe \"!SCRIPT_DIR!tools\oto_guncelle.vbs\"" /sc minute /mo 15 /ru "SYSTEM" /f > nul
 
     if !errorLevel! equ 0 (
         echo =====================================================
-        echo    🎉 SERVIS BASARIYLA KURULDU VE AKTIF EDILDI!
+        echo    SERVIS BASARIYLA KURULDU VE AKTIF EDILDI!
         echo =====================================================
         echo.
-        echo Eklentiniz artik her 15 dakikada bir arka planda sessizce guncellenecek.
+        echo Eklentiniz artik her 15 dakikada bir otomatik guncellenecek.
         echo.
     ) else (
-        echo ❌ Servis kurulurken bir hata olustu. Yetkilerinizi kontrol edin.
+        echo HATA: Servis kurulurken bir sorun olustu.
     )
 ) else (
     echo.

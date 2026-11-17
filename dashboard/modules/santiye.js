@@ -9,11 +9,45 @@ const DEFAULT_OCR_SPACE_KEY = "K81135367288957"; // Kullanıcının kişisel üc
 let santiyeState = {
   currentFile: null,
   currentImageDataUrl: null,
+  currentExcelText: null,
   extractedData: null,
   groqApiKey: DEFAULT_GROQ_API_KEY,
   selectedModel: DEFAULT_GROQ_MODEL,
   ocrSpaceApiKey: DEFAULT_OCR_SPACE_KEY
 };
+
+function isExcelFile(file) {
+  if (!file) return false;
+  const name = (file.name || '').toLowerCase();
+  const type = (file.type || '').toLowerCase();
+  return name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv') ||
+    type.includes('spreadsheetml') || type.includes('ms-excel') || type === 'text/csv';
+}
+
+async function parseExcelFileToText(file) {
+  if (typeof window.XLSX === 'undefined') {
+    throw new Error("Excel okuyucu kütüphanesi (XLSX) yüklenemedi.");
+  }
+  const ab = await file.arrayBuffer();
+  const wb = window.XLSX.read(new Uint8Array(ab), { type: 'array' });
+  let lines = [];
+  let rowCount = 0;
+
+  wb.SheetNames.forEach(sheetName => {
+    const ws = wb.Sheets[sheetName];
+    const rows = window.XLSX.utils.sheet_to_json(ws, { header: 1 });
+    rows.forEach(row => {
+      if (!Array.isArray(row)) return;
+      const cells = row.map(c => (c !== undefined && c !== null ? String(c).trim() : '')).filter(Boolean);
+      if (cells.length > 0) {
+        lines.push(cells.join(' | '));
+        rowCount++;
+      }
+    });
+  });
+
+  return { text: lines.join('\n'), rowCount, sheetCount: wb.SheetNames.length };
+}
 
 /**
  * Groq ve OCR.Space API ayarlarını chrome.storage'dan yükler
@@ -450,21 +484,39 @@ export function initSantiyeModule() {
   async function handleSelectedFile(file) {
     if (!file) return;
     santiyeState.currentFile = file;
+    santiyeState.currentImageDataUrl = null;
+    santiyeState.currentExcelText = null;
 
     if (statusContainer) statusContainer.style.display = "flex";
     if (statusText) statusText.textContent = "Belge önizlemesi hazırlanıyor...";
 
     try {
-      const dataUrl = await convertFileToDataUrl(file);
-      santiyeState.currentImageDataUrl = dataUrl;
+      if (isExcelFile(file)) {
+        const parsed = await parseExcelFileToText(file);
+        if (!parsed.text.trim() || parsed.rowCount === 0) {
+          throw new Error("Excel dosyasında okunabilir veri bulunamadı.");
+        }
+        santiyeState.currentExcelText = parsed.text;
+        if (previewImg) {
+          previewImg.src = "";
+          previewImg.style.display = "none";
+        }
+        if (previewInfo) {
+          previewInfo.textContent = `📊 ${file.name} (${parsed.rowCount} satır, ${(file.size / 1024).toFixed(1)} KB)`;
+        }
+      } else {
+        const dataUrl = await convertFileToDataUrl(file);
+        santiyeState.currentImageDataUrl = dataUrl;
 
-      if (previewImg) {
-        previewImg.src = dataUrl;
-        previewImg.style.display = "block";
+        if (previewImg) {
+          previewImg.src = dataUrl;
+          previewImg.style.display = "block";
+        }
+        if (previewInfo) {
+          previewInfo.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+        }
       }
-      if (previewInfo) {
-        previewInfo.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
-      }
+
       if (previewBox) previewBox.style.display = "block";
       if (dropzone) dropzone.style.display = "none";
       if (btnAnalyze) btnAnalyze.disabled = false;
@@ -481,6 +533,57 @@ export function initSantiyeModule() {
       handleSelectedFile(e.target.files[0]);
     }
   };
+
+  // Panodan Yapıştır Butonu (Lightshot / Ekran Görüntüsü)
+  const btnPaste = document.getElementById("btn-santiye-paste");
+  if (btnPaste) {
+    btnPaste.onclick = async (e) => {
+      e.stopPropagation();
+      try {
+        const clipboardItems = await navigator.clipboard.read();
+        for (const item of clipboardItems) {
+          const imgType = item.types.find(t => t.startsWith("image/"));
+          if (imgType) {
+            const blob = await item.getType(imgType);
+            const ext = imgType.split("/")[1] || "png";
+            const file = new File([blob], `ekran_goruntusu_${Date.now()}.${ext}`, { type: imgType });
+            await handleSelectedFile(file);
+            return;
+          }
+        }
+        alert("Panoda görsel bulunamadı. Lightshot ile ekran görüntüsü kopyaladıktan sonra tekrar deneyin.");
+      } catch (err) {
+        alert("Panoya erişilemedi. Doğrudan bu sayfada CTRL+V tuşlarına basarak da yapıştırabilirsiniz.");
+      }
+    };
+  }
+
+  // CTRL+V ile Doğrudan Lightshot / Pano Yapıştırma Desteği
+  document.addEventListener("paste", (e) => {
+    const pageSantiye = document.getElementById("page-santiye");
+    if (!pageSantiye || pageSantiye.style.display === "none") return;
+
+    const items = e.clipboardData?.items;
+    if (items) {
+      for (const item of items) {
+        if (item.type && item.type.startsWith("image/")) {
+          const blob = item.getAsFile();
+          if (blob) {
+            e.preventDefault();
+            const ext = item.type.split("/")[1] || "png";
+            const namedFile = new File([blob], `ekran_goruntusu_${Date.now()}.${ext}`, { type: item.type });
+            handleSelectedFile(namedFile);
+            return;
+          }
+        }
+      }
+    }
+
+    if (e.clipboardData?.files && e.clipboardData.files[0]) {
+      e.preventDefault();
+      handleSelectedFile(e.clipboardData.files[0]);
+    }
+  });
 
   dropzone.ondragover = (e) => {
     e.preventDefault();
@@ -501,9 +604,10 @@ export function initSantiyeModule() {
     btnRemoveFile.onclick = () => {
       santiyeState.currentFile = null;
       santiyeState.currentImageDataUrl = null;
+      santiyeState.currentExcelText = null;
       fileInput.value = "";
       if (previewBox) previewBox.style.display = "none";
-      if (dropzone) dropzone.style.display = "block";
+      if (dropzone) dropzone.style.display = "flex";
       if (btnAnalyze) btnAnalyze.disabled = true;
       const resultCard = document.getElementById("santiye-results-card");
       if (resultCard) resultCard.style.display = "none";
@@ -512,8 +616,8 @@ export function initSantiyeModule() {
 
   if (btnAnalyze) {
     btnAnalyze.onclick = async () => {
-      if (!santiyeState.currentImageDataUrl) {
-        alert("Lütfen önce bir evrak veya fotoğraf yükleyin.");
+      if (!santiyeState.currentImageDataUrl && !santiyeState.currentExcelText) {
+        alert("Lütfen önce bir evrak, ekran görüntüsü veya Excel dosyası yükleyin.");
         return;
       }
 
@@ -528,21 +632,25 @@ export function initSantiyeModule() {
         btnAnalyze.innerHTML = `<span>⏳ Taranıyor & Ayrıştırılıyor...</span>`;
       }
       if (statusContainer) statusContainer.style.display = "flex";
-      if (statusText) statusText.textContent = "1/2: Evrak OCR.Space (Tablo Motoru) ile taranıyor...";
 
       try {
         const modelSelect = document.getElementById("santiye-model-select");
         const chosenModel = modelSelect ? modelSelect.value : (santiyeState.selectedModel || DEFAULT_GROQ_MODEL);
 
-        // 1. Adım: OCR.Space API (Table Engine 2) ile Türkçe Tablo OCR yap
-        const rawText = await performOcrSpace(santiyeState.currentImageDataUrl, santiyeState.ocrSpaceApiKey);
+        let rawText = "";
+        if (santiyeState.currentExcelText) {
+          if (statusText) statusText.textContent = "Excel satırları okundu, Groq AI ile malzemeler ayrıştırılıyor...";
+          rawText = santiyeState.currentExcelText;
+        } else {
+          if (statusText) statusText.textContent = "1/2: Evrak OCR.Space (Tablo Motoru) ile taranıyor...";
+          rawText = await performOcrSpace(santiyeState.currentImageDataUrl, santiyeState.ocrSpaceApiKey);
 
-        if (!rawText || !rawText.trim()) {
-          throw new Error("Belgeden okunabilir metin çıkarılamadı. Lütfen daha net bir görsel yükleyin.");
+          if (!rawText || !rawText.trim()) {
+            throw new Error("Belgeden okunabilir metin çıkarılamadı. Lütfen daha net bir görsel yükleyin.");
+          }
+
+          if (statusText) statusText.textContent = "2/2: Groq Qwen AI ile malzemeler ayrıştırılıyor...";
         }
-
-        // 2. Adım: Groq Qwen ile JSON'a dönüştür
-        if (statusText) statusText.textContent = "2/2: Groq Qwen AI ile malzemeler ayrıştırılıyor...";
 
         const result = await analyzeTextWithGroq(
           rawText,

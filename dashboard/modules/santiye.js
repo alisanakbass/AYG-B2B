@@ -211,7 +211,7 @@ async function performOcrSpace(imageDataUrl, apiKey, retryCount = 0) {
 /**
  * Groq Qwen Metin Modeli üzerinden çıkarılan ham metni yapılandırılmış JSON'a dönüştürür
  */
-async function analyzeTextWithGroq(extractedText, apiKey, model) {
+async function analyzeTextWithGroq(extractedText, apiKey, model, onWait = null, retryCount = 0) {
   if (!apiKey) {
     throw new Error("Lütfen önce 'Ayarlar' sekmesinden GROQ API Anahtarınızı kaydedin.");
   }
@@ -273,6 +273,24 @@ Markdown (\`\`\`json) veya fazladan açıklama metni ekleme, sadece saf JSON dö
     } catch (_) {
       errorDetail = `HTTP ${response.status} ${response.statusText}`;
     }
+
+    if (response.status === 429 && retryCount < 5) {
+      let waitMs = 5000;
+      const retryAfter = response.headers.get("retry-after");
+      const secMatch = errorDetail.match(/try again in\s*([\d.]+)\s*s/i);
+      const msMatch = errorDetail.match(/try again in\s*([\d.]+)\s*ms/i);
+      if (secMatch) {
+        waitMs = Math.ceil(parseFloat(secMatch[1]) * 1000) + 1200;
+      } else if (msMatch) {
+        waitMs = Math.ceil(parseFloat(msMatch[1])) + 1200;
+      } else if (retryAfter && !isNaN(Number(retryAfter))) {
+        waitMs = Math.ceil(Number(retryAfter) * 1000) + 1200;
+      }
+      if (onWait) onWait(Math.ceil(waitMs / 1000));
+      await new Promise(r => setTimeout(r, waitMs));
+      return analyzeTextWithGroq(extractedText, apiKey, model, onWait, retryCount + 1);
+    }
+
     throw new Error(`Groq API Hatası: ${errorDetail}`);
   }
 
@@ -294,12 +312,12 @@ Markdown (\`\`\`json) veya fazladan açıklama metni ekleme, sadece saf JSON dö
 /**
  * Uzun metinleri/Excel listelerini parçalara bölerek Groq limitine takılmadan eksiksiz ayrıştırır
  */
-async function analyzeLongTextInChunks(rawText, apiKey, model, onProgress) {
+async function analyzeLongTextInChunks(rawText, apiKey, model, onProgress, onWait) {
   const lines = rawText.split(/\r?\n/).filter(l => l.trim().length > 0);
-  const CHUNK_SIZE = 25;
+  const CHUNK_SIZE = 15;
 
-  if (lines.length <= 30) {
-    return analyzeTextWithGroq(rawText, apiKey, model);
+  if (lines.length <= 18) {
+    return analyzeTextWithGroq(rawText, apiKey, model, onWait);
   }
 
   const totalChunks = Math.ceil(lines.length / CHUNK_SIZE);
@@ -313,7 +331,14 @@ async function analyzeLongTextInChunks(rawText, apiKey, model, onProgress) {
   for (let i = 0; i < totalChunks; i++) {
     if (onProgress) onProgress(i + 1, totalChunks);
     const chunkText = lines.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE).join("\n");
-    const part = await analyzeTextWithGroq(chunkText, apiKey, model);
+    const part = await analyzeTextWithGroq(
+      chunkText,
+      apiKey,
+      model,
+      (waitSec) => {
+        if (onWait) onWait(waitSec, i + 1, totalChunks);
+      }
+    );
 
     if (!merged.musteri_adi && part.musteri_adi) merged.musteri_adi = part.musteri_adi;
     if (!merged.santiye_adi && part.santiye_adi) merged.santiye_adi = part.santiye_adi;
@@ -706,6 +731,12 @@ export function initSantiyeModule() {
           (current, total) => {
             if (statusText) {
               statusText.textContent = `Groq AI ile malzemeler ayrıştırılıyor (Parça ${current}/${total})...`;
+            }
+          },
+          (waitSec, current, total) => {
+            if (statusText) {
+              const partInfo = total ? `Parça ${current}/${total} - ` : '';
+              statusText.textContent = `⏳ ${partInfo}Groq hız limiti nedeniyle ${waitSec} sn bekleniyor...`;
             }
           }
         );

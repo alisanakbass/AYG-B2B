@@ -252,7 +252,8 @@ Markdown (\`\`\`json) veya fazladan açıklama metni ekleme, sadece saf JSON dö
       { role: "user", content: tamPrompt }
     ],
     response_format: { type: "json_object" },
-    temperature: 0.1
+    temperature: 0.1,
+    max_tokens: 8192
   };
 
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -288,6 +289,47 @@ Markdown (\`\`\`json) veya fazladan açıklama metni ekleme, sadece saf JSON dö
     const cleaned = rawContent.replace(/```json/g, "").replace(/```/g, "").trim();
     return JSON.parse(cleaned);
   }
+}
+
+/**
+ * Uzun metinleri/Excel listelerini parçalara bölerek Groq limitine takılmadan eksiksiz ayrıştırır
+ */
+async function analyzeLongTextInChunks(rawText, apiKey, model, onProgress) {
+  const lines = rawText.split(/\r?\n/).filter(l => l.trim().length > 0);
+  const CHUNK_SIZE = 25;
+
+  if (lines.length <= 30) {
+    return analyzeTextWithGroq(rawText, apiKey, model);
+  }
+
+  const totalChunks = Math.ceil(lines.length / CHUNK_SIZE);
+  const merged = {
+    musteri_adi: "",
+    santiye_adi: "",
+    talep_tarihi: "",
+    kalemler: []
+  };
+
+  for (let i = 0; i < totalChunks; i++) {
+    if (onProgress) onProgress(i + 1, totalChunks);
+    const chunkText = lines.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE).join("\n");
+    const part = await analyzeTextWithGroq(chunkText, apiKey, model);
+
+    if (!merged.musteri_adi && part.musteri_adi) merged.musteri_adi = part.musteri_adi;
+    if (!merged.santiye_adi && part.santiye_adi) merged.santiye_adi = part.santiye_adi;
+    if (!merged.talep_tarihi && part.talep_tarihi) merged.talep_tarihi = part.talep_tarihi;
+
+    if (Array.isArray(part.kalemler) && part.kalemler.length > 0) {
+      merged.kalemler.push(...part.kalemler);
+    }
+  }
+
+  merged.kalemler = merged.kalemler.map((item, idx) => ({
+    ...item,
+    sira_no: idx + 1
+  }));
+
+  return merged;
 }
 
 /**
@@ -657,10 +699,15 @@ export function initSantiyeModule() {
           if (statusText) statusText.textContent = "2/2: Groq Qwen AI ile malzemeler ayrıştırılıyor...";
         }
 
-        const result = await analyzeTextWithGroq(
+        const result = await analyzeLongTextInChunks(
           rawText,
           santiyeState.groqApiKey,
-          chosenModel
+          chosenModel,
+          (current, total) => {
+            if (statusText) {
+              statusText.textContent = `Groq AI ile malzemeler ayrıştırılıyor (Parça ${current}/${total})...`;
+            }
+          }
         );
 
         santiyeState.extractedData = result;

@@ -2815,6 +2815,40 @@
                 </div>
 
                 <div style="display: flex; flex-direction: column; gap: 8px">
+                  <label for="gemini-api-key-input" style="font-size: 13px; font-weight: 600; color: var(--text)">
+                    Google Gemini API Anahtarı (Önerilen)
+                  </label>
+                  <div style="display: flex; gap: 8px">
+                    <input
+                      type="password"
+                      id="gemini-api-key-input"
+                      placeholder="Gemini API Key..."
+                      style="
+                        flex: 1;
+                        padding: 10px 14px;
+                        background: var(--bg-input);
+                        border: 1px solid var(--border);
+                        border-radius: 8px;
+                        font-family: monospace;
+                        font-size: 13px;
+                        color: var(--text);
+                      "
+                    />
+                    <button
+                      type="button"
+                      id="btn-toggle-gemini-key-visibility"
+                      class="btn-secondary"
+                      style="padding: 0 14px; font-size: 12px"
+                    >
+                      👁️ Göster
+                    </button>
+                  </div>
+                  <span style="font-size: 11.5px; color: var(--text-muted)">
+                    Fotoğraf, PDF ve 100+ kalemlik Excel dosyalarını OCR'a gerek kalmadan doğrudan okur. Ücretsiz anahtar: <a href="https://aistudio.google.com/apikey" target="_blank" style="color: #3b82f6; text-decoration: underline">aistudio.google.com</a>
+                  </span>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px">
                   <label for="groq-api-key-input" style="font-size: 13px; font-weight: 600; color: var(--text)">
                     Groq API Anahtarı (GROQ_API_KEY)
                   </label>
@@ -2864,7 +2898,9 @@
                       color: var(--text);
                     "
                   >
-                    <option value="qwen/qwen3.8-27b" selected>⚡ Groq Qwen 27B (Önerilen - Ultra Hızlı & Hassas)</option>
+                    <option value="gemini-2.5-flash" selected>✨ Google Gemini 2.5 Flash (Önerilen - Görsel & Excel En Hızlı)</option>
+                    <option value="gemini-2.5-pro">🧠 Google Gemini 2.5 Pro (En Yüksek Doğruluk)</option>
+                    <option value="qwen/qwen3.8-27b">⚡ Groq Qwen 27B</option>
                     <option value="openai/gpt-oss-120b">🧠 Groq GPT-OSS 120B (Gelişmiş Muhakeme)</option>
                   </select>
                 </div>
@@ -2905,7 +2941,7 @@
                   <span>📄</span> Evrak AI
                 </h2>
                 <p style="margin: 6px 0 0 0; font-size: 13.5px; color: var(--text-muted)">
-                  Müşterilerden gelen fatura, irsaliye, şantiye fişi, el yazısı sipariş veya WhatsApp görselini yükleyin; <b>OCR + Groq AI</b> okusun ve anında teklife dönüştürün.
+                  Müşterilerden gelen fatura, irsaliye, şantiye fişi, el yazısı sipariş, Excel veya WhatsApp görselini yükleyin; <b>Gemini Vision / Groq AI</b> okusun ve anında teklife dönüştürün.
                 </p>
               </div>
 
@@ -2923,7 +2959,9 @@
                     font-weight: 500;
                   "
                 >
-                  <option value="qwen/qwen3.8-27b" selected>⚡ Groq Qwen 27B (Önerilen)</option>
+                  <option value="gemini-2.5-flash" selected>✨ Google Gemini 2.5 Flash (Önerilen)</option>
+                  <option value="gemini-2.5-pro">🧠 Google Gemini 2.5 Pro</option>
+                  <option value="qwen/qwen3.8-27b">⚡ Groq Qwen 27B</option>
                   <option value="openai/gpt-oss-120b">🧠 Groq GPT-OSS 120B</option>
                 </select>
               </div>

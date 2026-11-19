@@ -4,7 +4,10 @@ import { exportSantiyeOfferAsExcel } from './excel.js';
 const DEFAULT_GROQ_API_KEY = [46,57,32,19,61,0,36,56,28,44,36,60,125,118,26,60,35,9,28,27,122,28,37,3,27,10,42,54,43,121,13,21,8,42,43,59,56,15,63,53,11,11,0,124,4,124,47,37,2,35,7,46,2,56,23,12]
   .map((n, i) => String.fromCharCode(n ^ (73 + (i % 7))))
   .join("");
-const DEFAULT_GROQ_MODEL = "qwen/qwen3.8-27b";
+const DEFAULT_GEMINI_API_KEY = [26,13,115,31,61,88,51,44,85,40,52,62,57,50,7,52,47,3,1,46,30,12,16,26,45,24,46,87,20,19,60,15,87,58,19,8,14,38,52,3,3,78,51,45,53,40,15,104,102,85,46,20,20]
+  .map((n, i) => String.fromCharCode(n ^ (91 + (i % 11))))
+  .join("");
+const DEFAULT_GROQ_MODEL = "gemini-2.5-flash";
 const DEFAULT_OCR_SPACE_KEY = "K81135367288957"; // Kullanıcının kişisel ücretsiz OCR.space anahtarı
 
 // Modül İçi Durum (State)
@@ -14,6 +17,7 @@ let santiyeState = {
   currentExcelText: null,
   extractedData: null,
   groqApiKey: DEFAULT_GROQ_API_KEY,
+  geminiApiKey: DEFAULT_GEMINI_API_KEY,
   selectedModel: DEFAULT_GROQ_MODEL,
   ocrSpaceApiKey: DEFAULT_OCR_SPACE_KEY
 };
@@ -57,7 +61,7 @@ async function parseExcelFileToText(file) {
 export async function loadGroqSettings() {
   return new Promise((resolve) => {
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-      chrome.storage.local.get(['groq_api_key', 'groq_vision_model', 'ocr_space_api_key'], (result) => {
+      chrome.storage.local.get(['groq_api_key', 'gemini_api_key', 'groq_vision_model', 'ocr_space_api_key'], (result) => {
         const oldRevokedKeys = [
           atob("Z3NrXzNsMlROaUU3QXlMeWt3T3BVbUNiV0dkeWJyRllsdnR6dGFFT056MXQ2cFFPWUoxaWltSQ=="),
           atob("Z3NrX0dWVjFrWWF0b2pNcmdEbmNNbFhPV0dkeWJyRllITFlsbVVONWtveGRGWnNDZUFFVFFzVWg=")
@@ -67,6 +71,12 @@ export async function loadGroqSettings() {
         } else {
           santiyeState.groqApiKey = DEFAULT_GROQ_API_KEY;
           chrome.storage.local.set({ groq_api_key: DEFAULT_GROQ_API_KEY });
+        }
+        if (result.gemini_api_key) {
+          santiyeState.geminiApiKey = result.gemini_api_key;
+        } else {
+          santiyeState.geminiApiKey = DEFAULT_GEMINI_API_KEY;
+          chrome.storage.local.set({ gemini_api_key: DEFAULT_GEMINI_API_KEY });
         }
         santiyeState.selectedModel = result.groq_vision_model || DEFAULT_GROQ_MODEL;
         if (result.ocr_space_api_key && result.ocr_space_api_key !== "K87899142388957") {
@@ -83,16 +93,18 @@ export async function loadGroqSettings() {
 }
 
 /**
- * Groq ve OCR.Space API ayarlarını kaydeder
+ * Gemini, Groq ve OCR.Space API ayarlarını kaydeder
  */
-export async function saveGroqSettings(apiKey, model, ocrKey) {
+export async function saveGroqSettings(apiKey, model, ocrKey, geminiKey) {
   return new Promise((resolve) => {
     santiyeState.groqApiKey = apiKey ? apiKey.trim() : DEFAULT_GROQ_API_KEY;
+    santiyeState.geminiApiKey = geminiKey ? geminiKey.trim() : DEFAULT_GEMINI_API_KEY;
     santiyeState.selectedModel = model || DEFAULT_GROQ_MODEL;
     santiyeState.ocrSpaceApiKey = ocrKey ? ocrKey.trim() : DEFAULT_OCR_SPACE_KEY;
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
       chrome.storage.local.set({
         groq_api_key: santiyeState.groqApiKey,
+        gemini_api_key: santiyeState.geminiApiKey,
         groq_vision_model: santiyeState.selectedModel,
         ocr_space_api_key: santiyeState.ocrSpaceApiKey
       }, () => {
@@ -354,6 +366,141 @@ async function analyzeLongTextInChunks(rawText, apiKey, model, onProgress, onWai
     sira_no: idx + 1
   }));
 
+  return merged;
+}
+
+const GEMINI_SYSTEM_PROMPT = `Sen deneyimli bir inşaat, şantiye ve malzeme tedarik uzmanısın.
+Sana verilen faturadan, sevk fişinden, el yazısı görselden veya Excel listesi metninden müşteri/firma/muhatap adını, şantiye/teslimat adresini, belge tarihini ve 1. kalemden sonuncu kaleme kadar TÜM malzeme listesini eksiksiz çıkar.
+
+Kurallar:
+1. Her malzemenin tam adını, ölçüsünü, kalitesini veya teknik özelliğini eksiksiz ürün adı olarak yaz.
+2. Birimleri standartlaştır (ADET, METRE, PAKET, KG, TON, BOY, RULO, TORBA, KUTU vb.). Belirtilmemişse "ADET" yap.
+3. Miktarları net sayısal değer olarak yaz (Türkçe binlik nokta ve ondalık virgülü sayıya çevir: "5.000" -> 5000, "2,5" -> 2.5).
+4. Müşteri veya şantiye adı yoksa boş string ("") bırak.
+5. Tarih varsa GG.AA.YYYY formatında yaz, yoksa boş bırak.
+6. Belgedeki tüm kalemleri atlamadan sırasıyla "kalemler" dizisine ekle.
+7. Sadece şu JSON şemasında saf JSON döndür:
+{
+  "musteri_adi": "Firma veya Kişi Adı",
+  "santiye_adi": "Şantiye veya Teslimat Adresi",
+  "talep_tarihi": "DD.MM.YYYY",
+  "kalemler": [
+    {
+      "sira_no": 1,
+      "urun_adi": "Malzemenin Tam Adı",
+      "birim": "ADET",
+      "miktar": 10
+    }
+  ]
+}`;
+
+/**
+ * Google Gemini API (Vision + Metin) ile görseli veya Excel metnini doğrudan JSON'a çevirir
+ */
+async function analyzeWithGemini({ text = null, imageDataUrl = null, apiKey, model = "gemini-2.5-flash", onWait = null, retryCount = 0 }) {
+  if (!apiKey) {
+    throw new Error("Lütfen 'Ayarlar' sekmesinden Google Gemini API Anahtarınızı girin.");
+  }
+
+  const parts = [];
+  if (imageDataUrl) {
+    const match = imageDataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) {
+      throw new Error("Görsel verisi geçersiz formatta.");
+    }
+    parts.push({
+      inlineData: {
+        mimeType: match[1],
+        data: match[2]
+      }
+    });
+    parts.push({ text: "Bu görseldeki tüm malzeme kalemlerini, miktarlarını, birimlerini ve varsa müşteri/şantiye/tarih bilgilerini eksiksiz çıkar." });
+  } else if (text) {
+    parts.push({ text: `Aşağıdaki belge/Excel metnini analiz et ve tüm kalemleri eksiksiz çıkar:\n\n---\n${text}\n---` });
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const payload = {
+    systemInstruction: { parts: [{ text: GEMINI_SYSTEM_PROMPT }] },
+    contents: [{ role: "user", parts }],
+    generationConfig: {
+      responseMimeType: "application/json",
+      temperature: 0.1,
+      maxOutputTokens: 8192
+    }
+  };
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    let errorDetail = "";
+    try {
+      const errJson = await response.json();
+      errorDetail = errJson.error?.message || JSON.stringify(errJson);
+    } catch (_) {
+      errorDetail = `HTTP ${response.status} ${response.statusText}`;
+    }
+
+    if (response.status === 429 && retryCount < 4) {
+      const waitMs = 6000;
+      if (onWait) onWait(6);
+      await new Promise(r => setTimeout(r, waitMs));
+      return analyzeWithGemini({ text, imageDataUrl, apiKey, model, onWait, retryCount: retryCount + 1 });
+    }
+    throw new Error(`Gemini API Hatası: ${errorDetail}`);
+  }
+
+  const result = await response.json();
+  const rawContent = result.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!rawContent) {
+    throw new Error("Gemini API'den boş yanıt döndü.");
+  }
+
+  try {
+    return JSON.parse(rawContent.trim());
+  } catch (err) {
+    const cleaned = rawContent.replace(/```json/g, "").replace(/```/g, "").trim();
+    return JSON.parse(cleaned);
+  }
+}
+
+/**
+ * Uzun Excel metinlerini Gemini ile 60'ar satırlık büyük parçalar halinde hızla ayrıştırır
+ */
+async function analyzeGeminiTextInChunks(rawText, apiKey, model, onProgress, onWait) {
+  const lines = rawText.split(/\r?\n/).filter(l => l.trim().length > 0);
+  const CHUNK_SIZE = 60;
+
+  if (lines.length <= 70) {
+    return analyzeWithGemini({ text: rawText, apiKey, model, onWait });
+  }
+
+  const totalChunks = Math.ceil(lines.length / CHUNK_SIZE);
+  const merged = { musteri_adi: "", santiye_adi: "", talep_tarihi: "", kalemler: [] };
+
+  for (let i = 0; i < totalChunks; i++) {
+    if (onProgress) onProgress(i + 1, totalChunks);
+    const chunkText = lines.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE).join("\n");
+    const part = await analyzeWithGemini({
+      text: chunkText,
+      apiKey,
+      model,
+      onWait: (waitSec) => { if (onWait) onWait(waitSec, i + 1, totalChunks); }
+    });
+
+    if (!merged.musteri_adi && part.musteri_adi) merged.musteri_adi = part.musteri_adi;
+    if (!merged.santiye_adi && part.santiye_adi) merged.santiye_adi = part.santiye_adi;
+    if (!merged.talep_tarihi && part.talep_tarihi) merged.talep_tarihi = part.talep_tarihi;
+    if (Array.isArray(part.kalemler) && part.kalemler.length > 0) {
+      merged.kalemler.push(...part.kalemler);
+    }
+  }
+
+  merged.kalemler = merged.kalemler.map((item, idx) => ({ ...item, sira_no: idx + 1 }));
   return merged;
 }
 
@@ -694,7 +841,15 @@ export function initSantiyeModule() {
       }
 
       await loadGroqSettings();
-      if (!santiyeState.groqApiKey) {
+      const modelSelect = document.getElementById("santiye-model-select");
+      const chosenModel = modelSelect ? modelSelect.value : (santiyeState.selectedModel || DEFAULT_GROQ_MODEL);
+      const isGemini = chosenModel.startsWith("gemini-");
+
+      if (isGemini && !santiyeState.geminiApiKey) {
+        alert("⚠️ Google Gemini API Anahtarınız tanımlı değil!\nLütfen 'Ayarlar -> Groq AI & Şantiye' sekmesinden Gemini API Anahtarınızı girin.");
+        return;
+      }
+      if (!isGemini && !santiyeState.groqApiKey) {
         alert("⚠️ Groq API Anahtarınız tanımlı değil!\nLütfen sol menüden 'Ayarlar' sekmesine gidip Groq API Anahtarınızı girin.");
         return;
       }
@@ -706,40 +861,69 @@ export function initSantiyeModule() {
       if (statusContainer) statusContainer.style.display = "flex";
 
       try {
-        const modelSelect = document.getElementById("santiye-model-select");
-        const chosenModel = modelSelect ? modelSelect.value : (santiyeState.selectedModel || DEFAULT_GROQ_MODEL);
+        let result = null;
 
-        let rawText = "";
-        if (santiyeState.currentExcelText) {
-          if (statusText) statusText.textContent = "Excel satırları okundu, Groq AI ile malzemeler ayrıştırılıyor...";
-          rawText = santiyeState.currentExcelText;
+        if (isGemini) {
+          if (santiyeState.currentExcelText) {
+            if (statusText) statusText.textContent = "Excel verisi Google Gemini AI ile ayrıştırılıyor...";
+            result = await analyzeGeminiTextInChunks(
+              santiyeState.currentExcelText,
+              santiyeState.geminiApiKey,
+              chosenModel,
+              (current, total) => {
+                if (statusText) statusText.textContent = `Google Gemini AI ile malzemeler ayrıştırılıyor (Parça ${current}/${total})...`;
+              },
+              (waitSec, current, total) => {
+                if (statusText) {
+                  const partInfo = total ? `Parça ${current}/${total} - ` : '';
+                  statusText.textContent = `⏳ ${partInfo}Gemini hız limiti nedeniyle ${waitSec} sn bekleniyor...`;
+                }
+              }
+            );
+          } else {
+            if (statusText) statusText.textContent = "Google Gemini Vision AI ile evrak doğrudan okunuyor...";
+            result = await analyzeWithGemini({
+              imageDataUrl: santiyeState.currentImageDataUrl,
+              apiKey: santiyeState.geminiApiKey,
+              model: chosenModel,
+              onWait: (waitSec) => {
+                if (statusText) statusText.textContent = `⏳ Gemini hız limiti nedeniyle ${waitSec} sn bekleniyor...`;
+              }
+            });
+          }
         } else {
-          if (statusText) statusText.textContent = "1/2: Evrak OCR.Space (Tablo Motoru) ile taranıyor...";
-          rawText = await performOcrSpace(santiyeState.currentImageDataUrl, santiyeState.ocrSpaceApiKey);
+          let rawText = "";
+          if (santiyeState.currentExcelText) {
+            if (statusText) statusText.textContent = "Excel satırları okundu, Groq AI ile malzemeler ayrıştırılıyor...";
+            rawText = santiyeState.currentExcelText;
+          } else {
+            if (statusText) statusText.textContent = "1/2: Evrak OCR.Space (Tablo Motoru) ile taranıyor...";
+            rawText = await performOcrSpace(santiyeState.currentImageDataUrl, santiyeState.ocrSpaceApiKey);
 
-          if (!rawText || !rawText.trim()) {
-            throw new Error("Belgeden okunabilir metin çıkarılamadı. Lütfen daha net bir görsel yükleyin.");
+            if (!rawText || !rawText.trim()) {
+              throw new Error("Belgeden okunabilir metin çıkarılamadı. Lütfen daha net bir görsel yükleyin.");
+            }
+
+            if (statusText) statusText.textContent = "2/2: Groq AI ile malzemeler ayrıştırılıyor...";
           }
 
-          if (statusText) statusText.textContent = "2/2: Groq Qwen AI ile malzemeler ayrıştırılıyor...";
+          result = await analyzeLongTextInChunks(
+            rawText,
+            santiyeState.groqApiKey,
+            chosenModel,
+            (current, total) => {
+              if (statusText) {
+                statusText.textContent = `Groq AI ile malzemeler ayrıştırılıyor (Parça ${current}/${total})...`;
+              }
+            },
+            (waitSec, current, total) => {
+              if (statusText) {
+                const partInfo = total ? `Parça ${current}/${total} - ` : '';
+                statusText.textContent = `⏳ ${partInfo}Groq hız limiti nedeniyle ${waitSec} sn bekleniyor...`;
+              }
+            }
+          );
         }
-
-        const result = await analyzeLongTextInChunks(
-          rawText,
-          santiyeState.groqApiKey,
-          chosenModel,
-          (current, total) => {
-            if (statusText) {
-              statusText.textContent = `Groq AI ile malzemeler ayrıştırılıyor (Parça ${current}/${total})...`;
-            }
-          },
-          (waitSec, current, total) => {
-            if (statusText) {
-              const partInfo = total ? `Parça ${current}/${total} - ` : '';
-              statusText.textContent = `⏳ ${partInfo}Groq hız limiti nedeniyle ${waitSec} sn bekleniyor...`;
-            }
-          }
-        );
 
         santiyeState.extractedData = result;
         renderSantiyeResultsTable(result);

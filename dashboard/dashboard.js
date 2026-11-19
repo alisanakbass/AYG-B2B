@@ -1444,13 +1444,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // --- GROQ AI & OCR AYARLARI VE ŞANTİYE MODÜLÜ ENTEGRASYONU ---
+  // --- GEMINI, GROQ AI & OCR AYARLARI VE ŞANTİYE MODÜLÜ ENTEGRASYONU ---
   async function syncGroqSettingsToUI() {
     const s = await loadGroqSettings();
+    const geminiKeyInput = document.getElementById('gemini-api-key-input');
     const apiKeyInput = document.getElementById('groq-api-key-input');
     const modelSelect = document.getElementById('groq-default-model-select');
     const pageModelSelect = document.getElementById('santiye-model-select');
     const ocrKeyInput = document.getElementById('ocr-space-api-key-input');
+    if (geminiKeyInput && s.geminiApiKey) geminiKeyInput.value = s.geminiApiKey;
     if (apiKeyInput && s.groqApiKey) apiKeyInput.value = s.groqApiKey;
     if (modelSelect && s.selectedModel) modelSelect.value = s.selectedModel;
     if (pageModelSelect && s.selectedModel) pageModelSelect.value = s.selectedModel;
@@ -1460,10 +1462,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnSaveGroq = document.getElementById('btn-save-groq-settings');
   if (btnSaveGroq) {
     btnSaveGroq.addEventListener('click', async () => {
+      const geminiKey = document.getElementById('gemini-api-key-input')?.value || '';
       const apiKey = document.getElementById('groq-api-key-input')?.value || '';
-      const model = document.getElementById('groq-default-model-select')?.value || 'qwen/qwen3.8-27b';
+      const model = document.getElementById('groq-default-model-select')?.value || 'gemini-2.5-flash';
       const ocrKey = document.getElementById('ocr-space-api-key-input')?.value || '';
-      await saveGroqSettings(apiKey, model, ocrKey);
+      await saveGroqSettings(apiKey, model, ocrKey, geminiKey);
       const pageModelSelect = document.getElementById('santiye-model-select');
       if (pageModelSelect) pageModelSelect.value = model;
 
@@ -1473,6 +1476,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(() => {
           statusSpan.style.display = 'none';
         }, 2500);
+      }
+    });
+  }
+
+  const btnToggleGeminiKey = document.getElementById('btn-toggle-gemini-key-visibility');
+  if (btnToggleGeminiKey) {
+    btnToggleGeminiKey.addEventListener('click', () => {
+      const input = document.getElementById('gemini-api-key-input');
+      if (input) {
+        if (input.type === 'password') {
+          input.type = 'text';
+          btnToggleGeminiKey.textContent = '🔒 Gizle';
+        } else {
+          input.type = 'password';
+          btnToggleGeminiKey.textContent = '👁️ Göster';
+        }
       }
     });
   }

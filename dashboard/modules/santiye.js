@@ -7,7 +7,7 @@ const DEFAULT_GROQ_API_KEY = [46,57,32,19,61,0,36,56,28,44,36,60,125,118,26,60,3
 const DEFAULT_GEMINI_API_KEY = [26,13,115,31,61,88,51,44,85,40,52,62,57,50,7,52,47,3,1,46,30,12,16,26,45,24,46,87,20,19,60,15,87,58,19,8,14,38,52,3,3,78,51,45,53,40,15,104,102,85,46,20,20]
   .map((n, i) => String.fromCharCode(n ^ (91 + (i % 11))))
   .join("");
-const DEFAULT_GROQ_MODEL = "gemini-3.8-flash";
+const DEFAULT_GROQ_MODEL = "qwen/qwen3.8-27b";
 const DEFAULT_OCR_SPACE_KEY = "K81135367288957"; // Kullanıcının kişisel ücretsiz OCR.space anahtarı
 
 // Modül İçi Durum (State)
@@ -15,6 +15,7 @@ let santiyeState = {
   currentFile: null,
   currentImageDataUrl: null,
   currentExcelText: null,
+  currentExcelRows: null,
   extractedData: null,
   groqApiKey: DEFAULT_GROQ_API_KEY,
   geminiApiKey: DEFAULT_GEMINI_API_KEY,
@@ -37,6 +38,7 @@ async function parseExcelFileToText(file) {
   const ab = await file.arrayBuffer();
   const wb = window.XLSX.read(new Uint8Array(ab), { type: 'array' });
   let lines = [];
+  let rawRows = [];
   let rowCount = 0;
 
   wb.SheetNames.forEach(sheetName => {
@@ -44,15 +46,17 @@ async function parseExcelFileToText(file) {
     const rows = window.XLSX.utils.sheet_to_json(ws, { header: 1 });
     rows.forEach(row => {
       if (!Array.isArray(row)) return;
-      const cells = row.map(c => (c !== undefined && c !== null ? String(c).trim() : '')).filter(Boolean);
-      if (cells.length > 0) {
+      const hasAny = row.some(c => c !== undefined && c !== null && String(c).trim() !== '');
+      if (hasAny) {
+        rawRows.push(row);
+        const cells = row.map(c => (c !== undefined && c !== null ? String(c).trim() : '')).filter(Boolean);
         lines.push(cells.join(' | '));
         rowCount++;
       }
     });
   });
 
-  return { text: lines.join('\n'), rowCount, sheetCount: wb.SheetNames.length };
+  return { text: lines.join('\n'), rows: rawRows, rowCount, sheetCount: wb.SheetNames.length };
 }
 
 /**
@@ -79,7 +83,7 @@ export async function loadGroqSettings() {
           chrome.storage.local.set({ gemini_api_key: DEFAULT_GEMINI_API_KEY });
         }
         let storedModel = result.groq_vision_model || DEFAULT_GROQ_MODEL;
-        if (storedModel === "gemini-2.5-flash" || storedModel === "gemini-2.5-pro") {
+        if (storedModel === "gemini-2.5-flash" || storedModel === "gemini-2.5-pro" || storedModel === "gemini-3.8-flash") {
           storedModel = DEFAULT_GROQ_MODEL;
           chrome.storage.local.set({ groq_vision_model: DEFAULT_GROQ_MODEL });
         }
@@ -450,9 +454,9 @@ async function analyzeWithGemini({ text = null, imageDataUrl = null, apiKey, mod
       errorDetail = `HTTP ${response.status} ${response.statusText}`;
     }
 
-    if ((response.status === 429 || response.status === 503 || response.status === 500) && retryCount < 3) {
-      const waitMs = 4000;
-      if (onWait) onWait(4);
+    if ((response.status === 429 || response.status === 503 || response.status === 500) && retryCount < 1) {
+      const waitMs = 2000;
+      if (onWait) onWait(2);
       await new Promise(r => setTimeout(r, waitMs));
       return analyzeWithGemini({ text, imageDataUrl, apiKey, model, onWait, retryCount: retryCount + 1 });
     }
@@ -507,6 +511,220 @@ async function analyzeGeminiTextInChunks(rawText, apiKey, model, onProgress, onW
 
   merged.kalemler = merged.kalemler.map((item, idx) => ({ ...item, sira_no: idx + 1 }));
   return merged;
+}
+
+/**
+ * Excel'in sadece ilk 15 satırını Groq'a gönderip sütun haritasını ~0.5 sn'de çıkarır
+ */
+async function detectExcelMappingWithGroq(rows, apiKey, model = "qwen/qwen3.8-27b") {
+  const sampleRows = rows.slice(0, 15).map((r, idx) => {
+    const cols = r.map((cell, cIdx) => {
+      const val = cell !== undefined && cell !== null ? String(cell).trim() : "";
+      return val ? `[${cIdx}]:"${val}"` : null;
+    }).filter(Boolean);
+    return `Satır ${idx}: ${cols.join(" | ")}`;
+  }).join("\n");
+
+  const systemPrompt = `Sen bir Excel tablo analiz uzmanısın. Sana bir malzeme/teklif/sipariş Excel dosyasının SADECE ilk satırları sütun indeksleriyle ([0], [1], [2]...) verilecek.
+Görevin tüm satırları listelemek DEĞİL, sadece hangi sütun numarasının ne olduğunu ve ürün verilerinin kaçıncı satırdan başladığını tespit etmektir.
+
+Sadece şu JSON şemasını döndür:
+{
+  "musteri_adi": "Varsa müşteri/firma adı yoksa boş string",
+  "santiye_adi": "Varsa şantiye/adres yoksa boş string",
+  "talep_tarihi": "Varsa GG.AA.YYYY formatında tarih yoksa boş string",
+  "data_start_row": 1,
+  "urun_col": 1,
+  "birim_col": 2,
+  "miktar_col": 3
+}
+
+Kurallar:
+- "data_start_row": Başlık satırından sonraki İLK gerçek ürün satırının indeksidir (örneğin başlık Satır 0 ise data_start_row = 1, başlık yoksa 0).
+- "urun_col": Malzeme/Ürün adının bulunduğu sütun indeksi (zorunlu, 0 tabanlı).
+- "birim_col": Birim (ADET, MT, KG, PAKET vb.) sütunu yoksa -1 yaz.
+- "miktar_col": Adet/Miktar sütunu yoksa -1 yaz (Sıra No sütununu miktar sanma!).
+- Sadece saf JSON döndür.`;
+
+  const payload = {
+    model: model.startsWith("gemini-") ? "qwen/qwen3.8-27b" : (model || "qwen/qwen3.8-27b"),
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: `Aşağıdaki Excel başlık ve örnek satırlarını haritala:\n\n${sampleRows}` }
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0,
+    max_tokens: 512
+  };
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Groq sütun haritalama hatası: HTTP ${response.status}`);
+  }
+  const result = await response.json();
+  const content = result.choices?.[0]?.message?.content;
+  if (!content) throw new Error("Groq boş harita döndürdü.");
+  const cleaned = content.replace(/```json/g, "").replace(/```/g, "").trim();
+  return JSON.parse(cleaned);
+}
+
+/**
+ * Groq ulaşılamazsa yedek yerel 2 katmanlı sütun algılayıcı
+ */
+function detectExcelMappingFallback(rows) {
+  let dataStartRow = 0;
+  let urunCol = -1;
+  let birimCol = -1;
+  let miktarCol = -1;
+
+  for (let r = 0; r < Math.min(15, rows.length); r++) {
+    const row = rows[r] || [];
+    const lowerCells = row.map(c => (c !== undefined && c !== null ? String(c).toLowerCase().trim() : ""));
+    let hits = 0;
+    lowerCells.forEach((txt, cIdx) => {
+      if (!txt) return;
+      if (/ürün|urun|malzeme|açıklama|aciklama|cins|stok|tanım|tanim|kalem/.test(txt)) { urunCol = cIdx; hits++; }
+      else if (/birim|ölçü|olcu|unit|brm/.test(txt)) { birimCol = cIdx; hits++; }
+      else if (/miktar|talep|sipariş|siparis|adet|qty/.test(txt) && !/fiyat|tutar|toplam|sıra|no/.test(txt)) { miktarCol = cIdx; hits++; }
+    });
+    if (hits >= 1 && urunCol !== -1) {
+      dataStartRow = r + 1;
+      break;
+    }
+  }
+
+  // Başlık bulunamadıysa veri içeriğine göre istatistiksel tahmin
+  if (urunCol === -1) {
+    const maxCols = Math.max(...rows.slice(0, 20).map(r => r.length), 1);
+    const scores = Array.from({ length: maxCols }, () => ({ textLen: 0, textCount: 0, numCount: 0, unitCount: 0 }));
+    const sampleLimit = Math.min(rows.length, 25);
+    for (let r = 0; r < sampleLimit; r++) {
+      const row = rows[r] || [];
+      for (let c = 0; c < maxCols; c++) {
+        const val = row[c] !== undefined && row[c] !== null ? String(row[c]).trim() : "";
+        if (!val) continue;
+        if (/^(ad\.?|adet|mt\.?|m|metre|kg\.?|ton|paket|pk\.?|koli|kutu|boy|rulo|torba|takım|set)$/i.test(val)) {
+          scores[c].unitCount++;
+        } else if (/^[\d.,\s]+$/.test(val)) {
+          scores[c].numCount++;
+        } else {
+          scores[c].textCount++;
+          scores[c].textLen += val.length;
+        }
+      }
+    }
+    let bestTextScore = -1;
+    let bestUnitScore = 0;
+    scores.forEach((sc, c) => {
+      const avgText = sc.textCount > 0 ? sc.textLen : 0;
+      if (avgText > bestTextScore) { bestTextScore = avgText; urunCol = c; }
+      if (sc.unitCount > bestUnitScore) { bestUnitScore = sc.unitCount; birimCol = c; }
+    });
+    // Miktar sütunu: en çok sayı içeren ama 1,2,3 sıra no olmayan sütun
+    let bestNumScore = 0;
+    scores.forEach((sc, c) => {
+      if (c === urunCol || c === birimCol) return;
+      if (sc.numCount > bestNumScore) {
+        const isSeq = rows.slice(0, Math.min(5, rows.length)).every((rw, idx) => Number(rw[c]) === idx + 1);
+        if (!isSeq || c > 0) {
+          bestNumScore = sc.numCount;
+          miktarCol = c;
+        }
+      }
+    });
+  }
+
+  return {
+    musteri_adi: "",
+    santiye_adi: "",
+    talep_tarihi: "",
+    data_start_row: dataStartRow,
+    urun_col: urunCol >= 0 ? urunCol : 0,
+    birim_col: birimCol,
+    miktar_col: miktarCol
+  };
+}
+
+function parseExcelQuantity(val) {
+  if (typeof val === "number") return isNaN(val) ? 1 : val;
+  if (val === undefined || val === null) return 1;
+  let s = String(val).trim();
+  if (!s) return 1;
+  // Türkçe format: 1.250 veya 2,5
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) {
+    s = s.replace(/\./g, "").replace(",", ".");
+  } else {
+    s = s.replace(",", ".");
+  }
+  const n = parseFloat(s.replace(/[^\d.]/g, ""));
+  return isNaN(n) || n <= 0 ? 1 : n;
+}
+
+function normalizeExcelUnit(val) {
+  if (val === undefined || val === null) return "ADET";
+  const u = String(val).trim().toUpperCase();
+  if (!u) return "ADET";
+  if (u === "AD" || u === "AD." || u.includes("ADET")) return "ADET";
+  if (u === "M" || u === "MT" || u === "MT." || u.includes("METRE")) return "METRE";
+  if (u === "PK" || u === "PK." || u.includes("PAKET")) return "PAKET";
+  if (u.includes("KOLİ") || u.includes("KOLI")) return "KOLİ";
+  if (u.includes("KUTU")) return "KUTU";
+  if (u.includes("KG")) return "KG";
+  if (u.includes("TON")) return "TON";
+  if (u.includes("BOY")) return "BOY";
+  if (u.includes("RULO")) return "RULO";
+  if (u.includes("TORBA")) return "TORBA";
+  if (u.includes("TAKIM") || u.includes("TK")) return "TAKIM";
+  if (u.includes("SET")) return "SET";
+  return u;
+}
+
+/**
+ * Haritaya göre Excel'deki TÜM satırları 0.01 saniyede yerel olarak çıkarır
+ */
+function extractItemsFromExcelRows(rows, mapping) {
+  const startRow = Math.max(0, Number(mapping.data_start_row) || 0);
+  const urunCol = Number(mapping.urun_col);
+  const birimCol = Number(mapping.birim_col);
+  const miktarCol = Number(mapping.miktar_col);
+
+  const kalemler = [];
+  for (let i = startRow; i < rows.length; i++) {
+    const row = rows[i];
+    if (!Array.isArray(row)) continue;
+
+    const rawName = (urunCol >= 0 && row[urunCol] !== undefined && row[urunCol] !== null) ? String(row[urunCol]).trim() : "";
+    if (!rawName || rawName.length < 2) continue;
+
+    const upperName = rawName.toUpperCase();
+    // Alt toplam veya tekrar eden başlık satırlarını atla
+    if (/^(TOPLAM|GENEL TOPLAM|ARA TOPLAM|KDV|NAKLİYE|İSKONTO|MALZEME ADI|ÜRÜN ADI|AÇIKLAMA)$/i.test(upperName)) continue;
+
+    const birim = birimCol >= 0 ? normalizeExcelUnit(row[birimCol]) : "ADET";
+    const miktar = miktarCol >= 0 ? parseExcelQuantity(row[miktarCol]) : 1;
+
+    kalemler.push({
+      sira_no: kalemler.length + 1,
+      urun_adi: rawName,
+      birim,
+      miktar
+    });
+  }
+
+  return {
+    musteri_adi: mapping.musteri_adi || "",
+    santiye_adi: mapping.santiye_adi || "",
+    talep_tarihi: mapping.talep_tarihi || "",
+    kalemler
+  };
 }
 
 /**
@@ -710,6 +928,7 @@ export function initSantiyeModule() {
     santiyeState.currentFile = file;
     santiyeState.currentImageDataUrl = null;
     santiyeState.currentExcelText = null;
+    santiyeState.currentExcelRows = null;
 
     if (statusContainer) statusContainer.style.display = "flex";
     if (statusText) statusText.textContent = "Belge önizlemesi hazırlanıyor...";
@@ -721,6 +940,7 @@ export function initSantiyeModule() {
           throw new Error("Excel dosyasında okunabilir veri bulunamadı.");
         }
         santiyeState.currentExcelText = parsed.text;
+        santiyeState.currentExcelRows = parsed.rows;
         if (previewImg) {
           previewImg.src = "";
           previewImg.style.display = "none";
@@ -829,6 +1049,7 @@ export function initSantiyeModule() {
       santiyeState.currentFile = null;
       santiyeState.currentImageDataUrl = null;
       santiyeState.currentExcelText = null;
+      santiyeState.currentExcelRows = null;
       fileInput.value = "";
       if (previewBox) previewBox.style.display = "none";
       if (dropzone) dropzone.style.display = "flex";
@@ -869,35 +1090,37 @@ export function initSantiyeModule() {
         let result = null;
         let runGroqFallback = false;
 
-        if (isGemini) {
+        if (santiyeState.currentExcelRows && santiyeState.currentExcelRows.length > 0) {
+          if (statusText) statusText.textContent = "1/2: Groq AI ile Excel başlıkları ve sütunlar analiz ediliyor...";
+          let mapping = null;
           try {
-            if (santiyeState.currentExcelText) {
-              if (statusText) statusText.textContent = "Excel verisi Google Gemini AI ile ayrıştırılıyor...";
-              result = await analyzeGeminiTextInChunks(
-                santiyeState.currentExcelText,
-                santiyeState.geminiApiKey,
-                chosenModel,
-                (current, total) => {
-                  if (statusText) statusText.textContent = `Google Gemini AI ile malzemeler ayrıştırılıyor (Parça ${current}/${total})...`;
-                },
-                (waitSec, current, total) => {
-                  if (statusText) {
-                    const partInfo = total ? `Parça ${current}/${total} - ` : '';
-                    statusText.textContent = `⏳ ${partInfo}Gemini yoğunluğu nedeniyle ${waitSec} sn bekleniyor...`;
-                  }
-                }
+            if (santiyeState.groqApiKey) {
+              mapping = await detectExcelMappingWithGroq(
+                santiyeState.currentExcelRows,
+                santiyeState.groqApiKey,
+                chosenModel
               );
-            } else {
-              if (statusText) statusText.textContent = "Google Gemini Vision AI ile evrak doğrudan okunuyor...";
-              result = await analyzeWithGemini({
-                imageDataUrl: santiyeState.currentImageDataUrl,
-                apiKey: santiyeState.geminiApiKey,
-                model: chosenModel,
-                onWait: (waitSec) => {
-                  if (statusText) statusText.textContent = `⏳ Gemini yoğunluğu nedeniyle ${waitSec} sn bekleniyor...`;
-                }
-              });
             }
+          } catch (mapErr) {
+            console.warn("[Evrak AI] Groq başlık analizi başarısız, akıllı yerel algılayıcıya geçiliyor:", mapErr.message);
+          }
+          if (!mapping || mapping.urun_col === undefined || mapping.urun_col < 0) {
+            mapping = detectExcelMappingFallback(santiyeState.currentExcelRows);
+          }
+
+          if (statusText) statusText.textContent = "2/2: Tüm Excel satırları yerel motorla anında aktarılıyor...";
+          result = extractItemsFromExcelRows(santiyeState.currentExcelRows, mapping);
+        } else if (isGemini) {
+          try {
+            if (statusText) statusText.textContent = "Google Gemini Vision AI ile evrak doğrudan okunuyor...";
+            result = await analyzeWithGemini({
+              imageDataUrl: santiyeState.currentImageDataUrl,
+              apiKey: santiyeState.geminiApiKey,
+              model: chosenModel,
+              onWait: (waitSec) => {
+                if (statusText) statusText.textContent = `⏳ Gemini yoğunluğu nedeniyle ${waitSec} sn bekleniyor...`;
+              }
+            });
           } catch (geminiErr) {
             if (santiyeState.groqApiKey && /high demand|503|429|quota|overloaded/i.test(geminiErr?.message || "")) {
               console.warn("[Evrak AI] Gemini yoğunluk hatası, yedek Groq AI'ya geçiliyor:", geminiErr.message);
@@ -909,23 +1132,16 @@ export function initSantiyeModule() {
           }
         }
 
-        if (!isGemini || runGroqFallback) {
+        if (!result && (!isGemini || runGroqFallback)) {
           const groqModel = isGemini ? "qwen/qwen3.8-27b" : chosenModel;
-          let rawText = "";
-          if (santiyeState.currentExcelText) {
-            if (statusText) statusText.textContent = "Excel satırları okundu, Groq AI ile malzemeler ayrıştırılıyor...";
-            rawText = santiyeState.currentExcelText;
-          } else {
-            if (statusText) statusText.textContent = "1/2: Evrak OCR.Space (Tablo Motoru) ile taranıyor...";
-            rawText = await performOcrSpace(santiyeState.currentImageDataUrl, santiyeState.ocrSpaceApiKey);
+          if (statusText) statusText.textContent = "1/2: Evrak OCR.Space (Tablo Motoru) ile taranıyor...";
+          const rawText = await performOcrSpace(santiyeState.currentImageDataUrl, santiyeState.ocrSpaceApiKey);
 
-            if (!rawText || !rawText.trim()) {
-              throw new Error("Belgeden okunabilir metin çıkarılamadı. Lütfen daha net bir görsel yükleyin.");
-            }
-
-            if (statusText) statusText.textContent = "2/2: Groq AI ile malzemeler ayrıştırılıyor...";
+          if (!rawText || !rawText.trim()) {
+            throw new Error("Belgeden okunabilir metin çıkarılamadı. Lütfen daha net bir görsel yükleyin.");
           }
 
+          if (statusText) statusText.textContent = "2/2: Groq AI ile malzemeler ayrıştırılıyor...";
           result = await analyzeLongTextInChunks(
             rawText,
             santiyeState.groqApiKey,

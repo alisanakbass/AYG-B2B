@@ -7,7 +7,7 @@ const DEFAULT_GROQ_API_KEY = [46,57,32,19,61,0,36,56,28,44,36,60,125,118,26,60,3
 const DEFAULT_GEMINI_API_KEY = [26,13,115,31,61,88,51,44,85,40,52,62,57,50,7,52,47,3,1,46,30,12,16,26,45,24,46,87,20,19,60,15,87,58,19,8,14,38,52,3,3,78,51,45,53,40,15,104,102,85,46,20,20]
   .map((n, i) => String.fromCharCode(n ^ (91 + (i % 11))))
   .join("");
-const DEFAULT_GROQ_MODEL = "gemini-2.5-flash";
+const DEFAULT_GROQ_MODEL = "gemini-3.8-flash";
 const DEFAULT_OCR_SPACE_KEY = "K81135367288957"; // Kullanıcının kişisel ücretsiz OCR.space anahtarı
 
 // Modül İçi Durum (State)
@@ -78,7 +78,12 @@ export async function loadGroqSettings() {
           santiyeState.geminiApiKey = DEFAULT_GEMINI_API_KEY;
           chrome.storage.local.set({ gemini_api_key: DEFAULT_GEMINI_API_KEY });
         }
-        santiyeState.selectedModel = result.groq_vision_model || DEFAULT_GROQ_MODEL;
+        let storedModel = result.groq_vision_model || DEFAULT_GROQ_MODEL;
+        if (storedModel === "gemini-2.5-flash" || storedModel === "gemini-2.5-pro") {
+          storedModel = DEFAULT_GROQ_MODEL;
+          chrome.storage.local.set({ groq_vision_model: DEFAULT_GROQ_MODEL });
+        }
+        santiyeState.selectedModel = storedModel;
         if (result.ocr_space_api_key && result.ocr_space_api_key !== "K87899142388957") {
           santiyeState.ocrSpaceApiKey = result.ocr_space_api_key;
         } else {
@@ -397,7 +402,7 @@ Kurallar:
 /**
  * Google Gemini API (Vision + Metin) ile görseli veya Excel metnini doğrudan JSON'a çevirir
  */
-async function analyzeWithGemini({ text = null, imageDataUrl = null, apiKey, model = "gemini-2.5-flash", onWait = null, retryCount = 0 }) {
+async function analyzeWithGemini({ text = null, imageDataUrl = null, apiKey, model = "gemini-3.8-flash", onWait = null, retryCount = 0 }) {
   if (!apiKey) {
     throw new Error("Lütfen 'Ayarlar' sekmesinden Google Gemini API Anahtarınızı girin.");
   }
@@ -445,9 +450,9 @@ async function analyzeWithGemini({ text = null, imageDataUrl = null, apiKey, mod
       errorDetail = `HTTP ${response.status} ${response.statusText}`;
     }
 
-    if (response.status === 429 && retryCount < 4) {
-      const waitMs = 6000;
-      if (onWait) onWait(6);
+    if ((response.status === 429 || response.status === 503 || response.status === 500) && retryCount < 3) {
+      const waitMs = 4000;
+      if (onWait) onWait(4);
       await new Promise(r => setTimeout(r, waitMs));
       return analyzeWithGemini({ text, imageDataUrl, apiKey, model, onWait, retryCount: retryCount + 1 });
     }
@@ -862,36 +867,50 @@ export function initSantiyeModule() {
 
       try {
         let result = null;
+        let runGroqFallback = false;
 
         if (isGemini) {
-          if (santiyeState.currentExcelText) {
-            if (statusText) statusText.textContent = "Excel verisi Google Gemini AI ile ayrıştırılıyor...";
-            result = await analyzeGeminiTextInChunks(
-              santiyeState.currentExcelText,
-              santiyeState.geminiApiKey,
-              chosenModel,
-              (current, total) => {
-                if (statusText) statusText.textContent = `Google Gemini AI ile malzemeler ayrıştırılıyor (Parça ${current}/${total})...`;
-              },
-              (waitSec, current, total) => {
-                if (statusText) {
-                  const partInfo = total ? `Parça ${current}/${total} - ` : '';
-                  statusText.textContent = `⏳ ${partInfo}Gemini hız limiti nedeniyle ${waitSec} sn bekleniyor...`;
+          try {
+            if (santiyeState.currentExcelText) {
+              if (statusText) statusText.textContent = "Excel verisi Google Gemini AI ile ayrıştırılıyor...";
+              result = await analyzeGeminiTextInChunks(
+                santiyeState.currentExcelText,
+                santiyeState.geminiApiKey,
+                chosenModel,
+                (current, total) => {
+                  if (statusText) statusText.textContent = `Google Gemini AI ile malzemeler ayrıştırılıyor (Parça ${current}/${total})...`;
+                },
+                (waitSec, current, total) => {
+                  if (statusText) {
+                    const partInfo = total ? `Parça ${current}/${total} - ` : '';
+                    statusText.textContent = `⏳ ${partInfo}Gemini yoğunluğu nedeniyle ${waitSec} sn bekleniyor...`;
+                  }
                 }
-              }
-            );
-          } else {
-            if (statusText) statusText.textContent = "Google Gemini Vision AI ile evrak doğrudan okunuyor...";
-            result = await analyzeWithGemini({
-              imageDataUrl: santiyeState.currentImageDataUrl,
-              apiKey: santiyeState.geminiApiKey,
-              model: chosenModel,
-              onWait: (waitSec) => {
-                if (statusText) statusText.textContent = `⏳ Gemini hız limiti nedeniyle ${waitSec} sn bekleniyor...`;
-              }
-            });
+              );
+            } else {
+              if (statusText) statusText.textContent = "Google Gemini Vision AI ile evrak doğrudan okunuyor...";
+              result = await analyzeWithGemini({
+                imageDataUrl: santiyeState.currentImageDataUrl,
+                apiKey: santiyeState.geminiApiKey,
+                model: chosenModel,
+                onWait: (waitSec) => {
+                  if (statusText) statusText.textContent = `⏳ Gemini yoğunluğu nedeniyle ${waitSec} sn bekleniyor...`;
+                }
+              });
+            }
+          } catch (geminiErr) {
+            if (santiyeState.groqApiKey && /high demand|503|429|quota|overloaded/i.test(geminiErr?.message || "")) {
+              console.warn("[Evrak AI] Gemini yoğunluk hatası, yedek Groq AI'ya geçiliyor:", geminiErr.message);
+              if (statusText) statusText.textContent = "⚠️ Gemini yoğun, yedek Groq AI'ya geçiliyor...";
+              runGroqFallback = true;
+            } else {
+              throw geminiErr;
+            }
           }
-        } else {
+        }
+
+        if (!isGemini || runGroqFallback) {
+          const groqModel = isGemini ? "qwen/qwen3.8-27b" : chosenModel;
           let rawText = "";
           if (santiyeState.currentExcelText) {
             if (statusText) statusText.textContent = "Excel satırları okundu, Groq AI ile malzemeler ayrıştırılıyor...";
@@ -910,7 +929,7 @@ export function initSantiyeModule() {
           result = await analyzeLongTextInChunks(
             rawText,
             santiyeState.groqApiKey,
-            chosenModel,
+            groqModel,
             (current, total) => {
               if (statusText) {
                 statusText.textContent = `Groq AI ile malzemeler ayrıştırılıyor (Parça ${current}/${total})...`;

@@ -1464,7 +1464,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnSaveGroq.addEventListener('click', async () => {
       const geminiKey = document.getElementById('gemini-api-key-input')?.value || '';
       const apiKey = document.getElementById('groq-api-key-input')?.value || '';
-      const model = document.getElementById('groq-default-model-select')?.value || 'gemini-2.5-flash';
+      const model = document.getElementById('groq-default-model-select')?.value || 'gemini-3.8-flash';
       const ocrKey = document.getElementById('ocr-space-api-key-input')?.value || '';
       await saveGroqSettings(apiKey, model, ocrKey, geminiKey);
       const pageModelSelect = document.getElementById('santiye-model-select');

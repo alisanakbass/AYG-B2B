@@ -112,7 +112,9 @@
       align-items: center;
       gap: 8px;
     }
+    .margin-box.hidden { display: none; }
     body.customer-mode .margin-box { display: none; }
+    body.customer-mode #margin-mode-btn { display: none; }
     body.customer-mode .buy-col { display: none; }
     body.customer-mode .badge-diff { display: none; }
     body.customer-mode .badge-best { display: none; }
@@ -327,7 +329,8 @@
       <span id="status-text">Hazır</span>
       <div class="controls-right">
         <button type="button" class="mode-btn" id="customer-mode-btn">👁️ Müşteri</button>
-        <div class="margin-box">
+        <button type="button" class="mode-btn active" id="margin-mode-btn">Kademeli</button>
+        <div class="margin-box hidden" id="margin-box">
           <span>Kâr %</span>
           <input type="number" id="margin-input" value="40" min="0" />
         </div>
@@ -354,6 +357,25 @@
     const PAGE_SIZE = 30;
     let visibleCount = PAGE_SIZE;
     let customerMode = false;
+    let marginMode = 'tiered';
+    const TIERED_MARGINS = [
+      { min: 0, max: 100, margin: 45 },
+      { min: 100, max: 1000, margin: 30 },
+      { min: 1000, max: 5000, margin: 20 },
+      { min: 5000, max: 20000, margin: 15 },
+      { min: 20000, max: Infinity, margin: 10 }
+    ];
+    function getEffectiveMargin(basePrice) {
+      if (marginMode === 'tiered') {
+        const p = parseFloat(basePrice) || 0;
+        let matched = 40;
+        for (const t of TIERED_MARGINS) {
+          if (p >= t.min && p <= t.max) matched = t.margin;
+        }
+        return matched;
+      }
+      return parseFloat(document.getElementById('margin-input').value) || 0;
+    }
 
     const fmt = (n) => Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
     const esc = (s) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -388,6 +410,15 @@
           `$ ${d.exchangeRates.USD.toFixed(2)} | € ${d.exchangeRates.EUR.toFixed(2)} | Fırat: ${d.firatCount}`;
       }
     }).catch(() => {});
+
+    document.getElementById('margin-mode-btn').addEventListener('click', () => {
+      marginMode = marginMode === 'tiered' ? 'flat' : 'tiered';
+      const btn = document.getElementById('margin-mode-btn');
+      btn.classList.toggle('active', marginMode === 'tiered');
+      btn.textContent = marginMode === 'tiered' ? 'Kademeli' : 'Sabit %';
+      document.getElementById('margin-box').classList.toggle('hidden', marginMode === 'tiered');
+      renderList();
+    });
 
     document.getElementById('margin-input').addEventListener('input', renderList);
 
@@ -456,12 +487,13 @@
       let html = shown.map((item, idx) => {
         const isBest = idx === 0;
         const diffPct = minPrice > 0 ? Math.round(((item.unitNetPrice - minPrice) / minPrice) * 100) : 0;
-        const sellWithVat = item.vatPrice * (1 + margin / 100);
+        const itemMargin = getEffectiveMargin(item.netPrice);
+        const sellWithVat = item.vatPrice * (1 + itemMargin / 100);
         const nameHtml = `<div class="prod-name">${esc(item.name)}</div>`;
         const thumbHtml = item.imgUrl
           ? `<div class="thumb-wrap"><img src="${esc(item.imgUrl)}" loading="lazy" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><span class="thumb-fallback">📦</span></div>`
           : `<div class="thumb-wrap"><span class="thumb-fallback" style="display:flex">📦</span></div>`;
-        const sellLabel = customerMode ? 'Satış Fiyatı (KDV Dahil)' : `Satış (+%${margin} Kâr, KDV Dahil)`;
+        const sellLabel = customerMode ? 'Satış Fiyatı (KDV Dahil)' : `Satış (+%${itemMargin} Kâr, KDV Dahil)`;
 
         return `
           <div class="card ${isBest ? 'cheapest' : ''} ${item.imgUrl ? 'has-photo' : ''}" data-name="${esc(item.name)}">

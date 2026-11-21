@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>AYG B2B Mobil</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --primary: #3b82f6;
+      --green: #10b981;
+      --amber: #f59e0b;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding-bottom: 40px;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(15, 23, 42, 0.96);
+      backdrop-filter: blur(8px);
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .brand-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .brand { font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+    .rates { font-size: 11px; color: var(--muted); }
+    .search-box {
+      display: flex;
+      gap: 8px;
+    }
+    .search-box input {
+      flex: 1;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      font-size: 15px;
+      outline: none;
+    }
+    .search-box input:focus { border-color: var(--primary); }
+    .search-box button {
+      padding: 0 18px;
+      border: none;
+      border-radius: 10px;
+      background: var(--primary);
+      color: white;
+      font-weight: 600;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .margin-box {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .margin-box input {
+      width: 56px;
+      padding: 4px 6px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      text-align: center;
+      font-weight: 600;
+    }
+    .filters {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 10px 14px 4px;
+      scrollbar-width: none;
+    }
+    .filters::-webkit-scrollbar { display: none; }
+    .chip {
+      flex-shrink: 0;
+      padding: 6px 12px;
+      border-radius: 20px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .chip.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+    }
+    .results {
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .card.cheapest {
+      border-color: var(--green);
+      box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.3);
+    }
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge-source {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+    }
+    .badge-best {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+    }
+    .badge-diff {
+      font-size: 11px;
+      font-weight: 600;
+      color: #fbbf24;
+    }
+    .prod-name {
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.35;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .prices {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+    .price-col { display: flex; flex-direction: column; }
+    .price-label { font-size: 11px; color: var(--muted); }
+    .price-val { font-size: 16px; font-weight: 700; color: var(--text); }
+    .price-sub { font-size: 11px; color: var(--muted); }
+    .price-sell { color: #34d399; }
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 40px 16px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand-row">
+      <div class="brand">📦 AYG B2B Mobil</div>
+      <div class="rates" id="rates-info">Yükleniyor...</div>
+    </div>
+    <form class="search-box" id="search-form">
+      <input type="search" id="q-input" placeholder="Ürün adı veya kod yazın..." autocomplete="off" />
+      <button type="submit" id="search-btn">Ara</button>
+    </form>
+    <div class="controls">
+      <span id="status-text">Hazır</span>
+      <div class="margin-box">
+        <span>Kâr %</span>
+        <input type="number" id="margin-input" value="40" min="0" />
+      </div>
+    </div>
+  </header>
+
+  <div class="filters" id="filters"></div>
+  <div class="results" id="results">
+    <div class="empty">Aramak istediğiniz ürünü yukarıya yazın.<br/>Tüm B2B siteleri taranıp en ucuz alıştan pahalıya sıralanacaktır.</div>
+  </div>
+
+  <script>
+    let allItems = [];
+    let activeFilter = 'ALL';
+
+    const fmt = (n) => Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+    const esc = (s) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    fetch('/api/status').then(r => r.json()).then(d => {
+      if (d.ok) {
+        document.getElementById('rates-info').textContent =
+          `$ ${d.exchangeRates.USD.toFixed(2)} | € ${d.exchangeRates.EUR.toFixed(2)} | Fırat: ${d.firatCount}`;
+      }
+    }).catch(() => {});
+
+    document.getElementById('margin-input').addEventListener('input', renderList);
+
+    document.getElementById('search-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const q = document.getElementById('q-input').value.trim();
+      if (!q) return;
+
+      const btn = document.getElementById('search-btn');
+      const status = document.getElementById('status-text');
+      const resultsEl = document.getElementById('results');
+
+      btn.disabled = true;
+      btn.textContent = '...';
+      status.textContent = 'B2B siteleri taranıyor...';
+      resultsEl.innerHTML = '<div class="empty">⏳ Tüm tedarikçilerden fiyatlar çekiliyor...</div>';
+
+      try {
+        const res = await fetch('/api/search?q=' + encodeURIComponent(q));
+        const data = await res.json();
+        allItems = data.items || [];
+        activeFilter = 'ALL';
+        status.textContent = `${allItems.length} ürün (${(data.elapsedMs / 1000).toFixed(1)} sn)`;
+        renderFilters();
+        renderList();
+      } catch (err) {
+        status.textContent = 'Bağlantı hatası';
+        resultsEl.innerHTML = `<div class="empty">Hata: ${esc(err.message)}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Ara';
+      }
+    });
+
+    function renderFilters() {
+      const el = document.getElementById('filters');
+      if (allItems.length === 0) { el.innerHTML = ''; return; }
+      const counts = {};
+      allItems.forEach(i => { counts[i.sourceKey] = (counts[i.sourceKey] || 0) + 1; });
+
+      let html = `<div class="chip ${activeFilter==='ALL'?'active':''}" data-key="ALL">Tümü (${allItems.length})</div>`;
+      const names = {};
+      allItems.forEach(i => { names[i.sourceKey] = i.sourceName; });
+      Object.keys(counts).forEach(k => {
+        html += `<div class="chip ${activeFilter===k?'active':''}" data-key="${k}">${esc(names[k])} (${counts[k]})</div>`;
+      });
+      el.innerHTML = html;
+      el.querySelectorAll('.chip').forEach(c => {
+        c.onclick = () => { activeFilter = c.dataset.key; renderFilters(); renderList(); };
+      });
+    }
+
+    function renderList() {
+      const el = document.getElementById('results');
+      const margin = parseFloat(document.getElementById('margin-input').value) || 0;
+      const list = activeFilter === 'ALL' ? allItems : allItems.filter(i => i.sourceKey === activeFilter);
+
+      if (list.length === 0) {
+        el.innerHTML = '<div class="empty">Sonuç bulunamadı.</div>';
+        return;
+      }
+
+      const minPrice = list[0].unitNetPrice;
+      el.innerHTML = list.map((item, idx) => {
+        const isBest = idx === 0;
+        const diffPct = minPrice > 0 ? Math.round(((item.unitNetPrice - minPrice) / minPrice) * 100) : 0;
+        const sellWithVat = item.vatPrice * (1 + margin / 100);
+        const nameHtml = item.productUrl
+          ? `<a class="prod-name" href="${esc(item.productUrl)}" target="_blank">${esc(item.name)} ↗</a>`
+          : `<div class="prod-name">${esc(item.name)}</div>`;
+
+        return `
+          <div class="card ${isBest ? 'cheapest' : ''}">
+            <div class="card-top">
+              <span class="badge-source">${esc(item.sourceName)}</span>
+              ${isBest
+                ? `<span class="badge-best">🏆 EN UCUZ ALIŞ</span>`
+                : (diffPct > 0 ? `<span class="badge-diff">+%${diffPct} daha pahalı</span>` : '')}
+            </div>
+            ${nameHtml}
+            <div class="prices">
+              <div class="price-col">
+                <span class="price-label">Alış (KDV Hariç)</span>
+                <span class="price-val">${fmt(item.netPrice)}</span>
+                <span class="price-sub">KDV Dahil: ${fmt(item.vatPrice)}</span>
+              </div>
+              <div class="price-col">
+                <span class="price-label">Satış (+%${margin} Kâr, KDV Dahil)</span>
+                <span class="price-val price-sell">${fmt(sellWithVat)}</span>
+                <span class="price-sub">${item.packQuantity > 1 ? `${item.packQuantity}li Paket (${fmt(item.unitNetPrice)}/Ad)` : esc(item.unit)}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  </script>
+</body>
+</html>

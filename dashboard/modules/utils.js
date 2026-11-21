@@ -2,12 +2,15 @@ import { state, FIRAT_IMAGES } from './state.js';
 
 // Fiyat Ayrıştırma
 export function parsePrice(priceStr) {
+  if (typeof priceStr === 'number') return priceStr;
   if (!priceStr) return 0;
-  let cleanStr = priceStr.replace(/[^0-9,.-]/g, '');
+  let cleanStr = String(priceStr).replace(/[^0-9,.-]/g, '');
   if (cleanStr.includes('.') && cleanStr.includes(',')) {
     cleanStr = cleanStr.replace(/\./g, '').replace(/,/g, '.');
   } else if (cleanStr.includes(',')) {
     cleanStr = cleanStr.replace(/,/g, '.');
+  } else if (/^-?\d{1,3}(\.\d{3})+$/.test(cleanStr)) {
+    cleanStr = cleanStr.replace(/\./g, '');
   }
   const val = parseFloat(cleanStr);
   return isNaN(val) ? 0 : val;

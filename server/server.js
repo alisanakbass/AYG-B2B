@@ -55,7 +55,7 @@ function parsePrice(str) {
   if (cleaned.includes(',')) {
     return parseFloat(cleaned.replace(',', '.'));
   }
-  if ((cleaned.match(/\./g) || []).length > 1) {
+  if ((cleaned.match(/\./g) || []).length > 1 || /^\d{1,3}(\.\d{3})+$/.test(cleaned)) {
     return parseFloat(cleaned.replace(/\./g, ''));
   }
   return parseFloat(cleaned);

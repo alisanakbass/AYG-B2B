@@ -289,16 +289,33 @@ async function searchEnder(query, isRetry = false) {
   const hits = data?.Data?.Hits?.$values || [];
   return hits.map(row => {
     const det = row.ProductDetails || {};
-    const name = det.ProductName || row.ProductName || 'Bilinmeyen Ürün';
-    const code = det.ProductCode || row.ProductCode || '';
+    const name = det.ProductName || row.ProductName || row.Title || row.Name || 'Bilinmeyen Ürün';
+    const code = det.ProductCode || row.ProductCode || row.Code || '';
     let pObj = {};
-    if (row.ProductPrices?.$values) pObj = row.ProductPrices.$values[0] || {};
-    else if (Array.isArray(row.ProductPrices)) pObj = row.ProductPrices[0] || {};
-    else if (row.ProductPrices) pObj = row.ProductPrices;
-    const netPrice = Number(pObj.Price || pObj.NetPrice || row.DiscountPrice || row.NetPrice || row.Price || 0);
-    const vatRate = Number(pObj.TaxRatio || det.TaxRatio || row.TaxRatio) || 20;
+    let rawPrice = 0;
+    if (row.ProductPrices) {
+      if (Array.isArray(row.ProductPrices)) {
+        pObj = row.ProductPrices[0] || {};
+        rawPrice = pObj.Price || pObj.Value || pObj.NetPrice || 0;
+      } else if (Array.isArray(row.ProductPrices.$values)) {
+        pObj = row.ProductPrices.$values[0] || {};
+        rawPrice = pObj.Price || pObj.Value || pObj.NetPrice || 0;
+      } else if (Array.isArray(row.ProductPrices.Values)) {
+        pObj = row.ProductPrices.Values[0] || {};
+        rawPrice = pObj.Price || pObj.Value || pObj.NetPrice || 0;
+      } else {
+        pObj = row.ProductPrices;
+        rawPrice = pObj.Price || pObj.NetPrice || pObj.PriceWithOrWithoutTax || 0;
+      }
+    }
+    if (!rawPrice) {
+      rawPrice = row.DiscountPrice || row.NetPrice || row.Price || row.B2BPrice ||
+        det.DiscountPrice || det.NetPrice || det.Price || det.B2BPrice || 0;
+    }
+    const netPrice = typeof rawPrice === 'number' ? rawPrice : parsePrice(String(rawPrice));
+    const vatRate = Number(pObj.TaxRatio || pObj.Tax || det.TaxRatio || row.TaxRatio || det.Tax || row.Tax) || 20;
     const vatPrice = netPrice * (1 + vatRate / 100);
-    let imgUrl = (det.ImageUrl || row.DefaultImage || '').trim();
+    let imgUrl = (det.ImageUrl || row.DefaultImage || row.Image || row.ImageUrl || '').trim().split(' ').join('%20');
     if (imgUrl && !imgUrl.startsWith('http')) imgUrl = `https://b2b.enderyapi.com.tr/${imgUrl.replace(/^\//, '')}`;
     const packQty = parsePackQty(name) || 1;
     return {
@@ -314,7 +331,7 @@ async function searchEnder(query, isRetry = false) {
       imgUrl,
       productUrl: code ? `https://b2b.enderyapi.com.tr/tr/urunler-s-${encodeURIComponent(code)}?page=1` : ''
     };
-  }).filter(x => x.netPrice > 0);
+  }).filter(x => !isNaN(x.netPrice) && x.netPrice > 0);
 }
 
 // 3. KAMİL TÜRK (SITE_H)
@@ -491,6 +508,70 @@ async function searchYasar(query, isRetry = false) {
   return results;
 }
 
+// 6. TOK TİCARET (SITE_I)
+async function loginTokTicaret() {
+  const res = await fetch('https://bayi.tokticaret.com.tr/ajax/Login.asp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'KullaniciAdi=M01A02&KullaniciKodu=1&Sifre=AYGUNLER01'
+  });
+  const txt = (await res.text()).trim();
+  if (txt === '1') {
+    sessions.tokCookie = extractCookies(res);
+    return true;
+  }
+  return false;
+}
+
+async function searchTokTicaret(query, isRetry = false) {
+  if (!sessions.tokCookie) await loginTokTicaret();
+  if (!sessions.tokCookie) return [];
+  const res = await fetch(`https://bayi.tokticaret.com.tr/SiparisGir.asp?sayfa=&FAdi=${encodeURIComponent(query)}&F=Ara&Sirala=varsayilan`, {
+    headers: { Cookie: sessions.tokCookie }
+  });
+  const html = await res.text();
+  if ((html.includes('frmLogin') || html.includes('KullaniciAdi')) && !isRetry) {
+    if (await loginTokTicaret()) return searchTokTicaret(query, true);
+    return [];
+  }
+  const trMatches = [...html.matchAll(/<tr[^>]*id="[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi)];
+  const results = [];
+  for (const m of trMatches) {
+    const tr = m[1];
+    const tdRaw = [...tr.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(x => x[1]);
+    if (tdRaw.length < 7) continue;
+    const code = stripTags(tdRaw[1]);
+    const name = stripTags(tdRaw[2]);
+    if (!name) continue;
+    const priceRaw = stripTags(tdRaw[6]);
+    let netPrice = parsePrice(priceRaw);
+    if (isNaN(netPrice) || netPrice <= 0) continue;
+    if (priceRaw.includes('$') || priceRaw.includes('USD')) netPrice *= exchangeRates.USD;
+    else if (priceRaw.includes('€') || priceRaw.includes('EUR')) netPrice *= exchangeRates.EUR;
+    const vatMatch = stripTags(tdRaw[7] || '').match(/(\d+)/);
+    const vatRate = vatMatch ? parseInt(vatMatch[1], 10) : 20;
+    const imgMatch = tdRaw[0].match(/(?:data-src|src)="([^"]+)"/i);
+    let imgUrl = imgMatch ? imgMatch[1].trim() : '';
+    if (imgUrl && !imgUrl.startsWith('http')) imgUrl = `https://bayi.tokticaret.com.tr/${imgUrl.replace(/^\//, '')}`;
+    const unitRaw = stripTags(tdRaw[9] || '').toUpperCase() || 'ADET';
+    const packQty = parsePackQty(name) || 1;
+    results.push({
+      sourceKey: 'SITE_I',
+      sourceName: 'Tok Ticaret',
+      code,
+      name,
+      netPrice,
+      vatPrice: netPrice * (1 + vatRate / 100),
+      vatRate,
+      unit: unitRaw,
+      packQuantity: packQty,
+      imgUrl,
+      productUrl: ''
+    });
+  }
+  return results;
+}
+
 // --- HTTP SUNUCU ---
 const mobileHtmlPath = path.join(__dirname, 'mobile.html');
 
@@ -529,7 +610,8 @@ const server = http.createServer(async (req, res) => {
       { key: 'SITE_B', fn: () => searchEnder(q) },
       { key: 'SITE_H', fn: () => searchKamilTurk(q) },
       { key: 'SITE_K', fn: () => searchRico(q) },
-      { key: 'SITE_C', fn: () => searchYasar(q) }
+      { key: 'SITE_C', fn: () => searchYasar(q) },
+      { key: 'SITE_I', fn: () => searchTokTicaret(q) }
     ];
 
     const settled = await Promise.allSettled(tasks.map(t => t.fn()));

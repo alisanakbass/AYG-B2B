@@ -92,6 +92,31 @@
       text-align: center;
       font-weight: 600;
     }
+    .mode-btn {
+      padding: 5px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .mode-btn.active {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: var(--green);
+      color: #34d399;
+    }
+    .controls-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    body.customer-mode .margin-box { display: none; }
+    body.customer-mode .buy-col { display: none; }
+    body.customer-mode .badge-diff { display: none; }
+    body.customer-mode .badge-best { display: none; }
+    body.customer-mode .prices { grid-template-columns: 1fr; }
     .filters {
       display: flex;
       gap: 8px;
@@ -162,12 +187,111 @@
       font-weight: 600;
       color: #fbbf24;
     }
+    .card-main {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .thumb-wrap {
+      width: 58px;
+      height: 58px;
+      flex-shrink: 0;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .thumb-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      background: #fff;
+    }
+    .thumb-fallback {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      opacity: 0.65;
+    }
     .prod-name {
       font-size: 14px;
       font-weight: 600;
       line-height: 1.35;
       color: var(--text);
       text-decoration: none;
+      flex: 1;
+    }
+    .load-more-btn {
+      width: 100%;
+      padding: 13px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    .load-more-btn:active { background: var(--border); }
+    .card.has-photo { cursor: pointer; }
+    .img-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(2, 6, 23, 0.88);
+      backdrop-filter: blur(4px);
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .img-modal.open { display: flex; }
+    .img-modal-box {
+      position: relative;
+      max-width: 92vw;
+      max-height: 85vh;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .img-modal-box img {
+      max-width: 100%;
+      max-height: 68vh;
+      border-radius: 10px;
+      background: #fff;
+      object-fit: contain;
+    }
+    .img-modal-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      text-align: center;
+      line-height: 1.35;
+    }
+    .img-modal-close {
+      position: absolute;
+      top: -12px;
+      right: -12px;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
     }
     .prices {
       display: grid;
@@ -201,9 +325,12 @@
     </form>
     <div class="controls">
       <span id="status-text">Hazır</span>
-      <div class="margin-box">
-        <span>Kâr %</span>
-        <input type="number" id="margin-input" value="40" min="0" />
+      <div class="controls-right">
+        <button type="button" class="mode-btn" id="customer-mode-btn">👁️ Müşteri</button>
+        <div class="margin-box">
+          <span>Kâr %</span>
+          <input type="number" id="margin-input" value="40" min="0" />
+        </div>
       </div>
     </div>
   </header>
@@ -213,12 +340,47 @@
     <div class="empty">Aramak istediğiniz ürünü yukarıya yazın.<br/>Tüm B2B siteleri taranıp en ucuz alıştan pahalıya sıralanacaktır.</div>
   </div>
 
+  <div class="img-modal" id="img-modal">
+    <div class="img-modal-box" onclick="event.stopPropagation()">
+      <button type="button" class="img-modal-close" id="img-modal-close">✕</button>
+      <img id="img-modal-src" src="" alt="" />
+      <div class="img-modal-title" id="img-modal-title"></div>
+    </div>
+  </div>
+
   <script>
     let allItems = [];
     let activeFilter = 'ALL';
+    const PAGE_SIZE = 30;
+    let visibleCount = PAGE_SIZE;
+    let customerMode = false;
 
     const fmt = (n) => Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
     const esc = (s) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    document.getElementById('customer-mode-btn').addEventListener('click', () => {
+      customerMode = !customerMode;
+      document.body.classList.toggle('customer-mode', customerMode);
+      const btn = document.getElementById('customer-mode-btn');
+      btn.classList.toggle('active', customerMode);
+      btn.textContent = customerMode ? '👁️ Müşteri: Açık' : '👁️ Müşteri';
+      renderList();
+    });
+
+    const imgModal = document.getElementById('img-modal');
+    const imgModalSrc = document.getElementById('img-modal-src');
+    const imgModalTitle = document.getElementById('img-modal-title');
+    function openImgModal(src, title) {
+      imgModalSrc.src = src;
+      imgModalTitle.textContent = title || '';
+      imgModal.classList.add('open');
+    }
+    function closeImgModal() {
+      imgModal.classList.remove('open');
+      imgModalSrc.src = '';
+    }
+    imgModal.addEventListener('click', closeImgModal);
+    document.getElementById('img-modal-close').addEventListener('click', closeImgModal);
 
     fetch('/api/status').then(r => r.json()).then(d => {
       if (d.ok) {
@@ -248,6 +410,7 @@
         const data = await res.json();
         allItems = data.items || [];
         activeFilter = 'ALL';
+        visibleCount = PAGE_SIZE;
         status.textContent = `${allItems.length} ürün (${(data.elapsedMs / 1000).toFixed(1)} sn)`;
         renderFilters();
         renderList();
@@ -274,7 +437,7 @@
       });
       el.innerHTML = html;
       el.querySelectorAll('.chip').forEach(c => {
-        c.onclick = () => { activeFilter = c.dataset.key; renderFilters(); renderList(); };
+        c.onclick = () => { activeFilter = c.dataset.key; visibleCount = PAGE_SIZE; renderFilters(); renderList(); };
       });
     }
 
@@ -289,31 +452,37 @@
       }
 
       const minPrice = list[0].unitNetPrice;
-      el.innerHTML = list.map((item, idx) => {
+      const shown = list.slice(0, visibleCount);
+      let html = shown.map((item, idx) => {
         const isBest = idx === 0;
         const diffPct = minPrice > 0 ? Math.round(((item.unitNetPrice - minPrice) / minPrice) * 100) : 0;
         const sellWithVat = item.vatPrice * (1 + margin / 100);
-        const nameHtml = item.productUrl
-          ? `<a class="prod-name" href="${esc(item.productUrl)}" target="_blank">${esc(item.name)} ↗</a>`
-          : `<div class="prod-name">${esc(item.name)}</div>`;
+        const nameHtml = `<div class="prod-name">${esc(item.name)}</div>`;
+        const thumbHtml = item.imgUrl
+          ? `<div class="thumb-wrap"><img src="${esc(item.imgUrl)}" loading="lazy" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><span class="thumb-fallback">📦</span></div>`
+          : `<div class="thumb-wrap"><span class="thumb-fallback" style="display:flex">📦</span></div>`;
+        const sellLabel = customerMode ? 'Satış Fiyatı (KDV Dahil)' : `Satış (+%${margin} Kâr, KDV Dahil)`;
 
         return `
-          <div class="card ${isBest ? 'cheapest' : ''}">
+          <div class="card ${isBest ? 'cheapest' : ''} ${item.imgUrl ? 'has-photo' : ''}" data-name="${esc(item.name)}">
             <div class="card-top">
               <span class="badge-source">${esc(item.sourceName)}</span>
               ${isBest
                 ? `<span class="badge-best">🏆 EN UCUZ ALIŞ</span>`
                 : (diffPct > 0 ? `<span class="badge-diff">+%${diffPct} daha pahalı</span>` : '')}
             </div>
-            ${nameHtml}
+            <div class="card-main">
+              ${thumbHtml}
+              ${nameHtml}
+            </div>
             <div class="prices">
-              <div class="price-col">
+              <div class="price-col buy-col">
                 <span class="price-label">Alış (KDV Hariç)</span>
                 <span class="price-val">${fmt(item.netPrice)}</span>
                 <span class="price-sub">KDV Dahil: ${fmt(item.vatPrice)}</span>
               </div>
               <div class="price-col">
-                <span class="price-label">Satış (+%${margin} Kâr, KDV Dahil)</span>
+                <span class="price-label">${sellLabel}</span>
                 <span class="price-val price-sell">${fmt(sellWithVat)}</span>
                 <span class="price-sub">${item.packQuantity > 1 ? `${item.packQuantity}li Paket (${fmt(item.unitNetPrice)}/Ad)` : esc(item.unit)}</span>
               </div>
@@ -321,6 +490,29 @@
           </div>
         `;
       }).join('');
+
+      if (list.length > visibleCount) {
+        html += `<button type="button" class="load-more-btn" id="load-more-btn">Daha Fazla Göster (${shown.length} / ${list.length})</button>`;
+      }
+
+      el.innerHTML = html;
+
+      el.querySelectorAll('.card.has-photo').forEach(card => {
+        card.onclick = () => {
+          const img = card.querySelector('.thumb-wrap img');
+          if (img && img.style.display !== 'none') {
+            openImgModal(img.src, card.dataset.name);
+          }
+        };
+      });
+
+      const moreBtn = document.getElementById('load-more-btn');
+      if (moreBtn) {
+        moreBtn.onclick = () => {
+          visibleCount += PAGE_SIZE;
+          renderList();
+        };
+      }
     }
   </script>
 </body>

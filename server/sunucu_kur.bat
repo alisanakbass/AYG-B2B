@@ -20,14 +20,23 @@ if %errorlevel% neq 0 (
 
 where node >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [1/4] Node.js bulunamadi, winget ile kuruluyor...
+    echo [1/4] Node.js bulunamadi, kuruluyor...
     where winget >nul 2>&1
-    if %errorlevel% neq 0 (
-        echo HATA: winget bulunamadi. Lutfen https://nodejs.org adresinden Node.js LTS kurun.
-        pause
-        exit /b 1
+    if !errorlevel! equ 0 (
+        winget install -e --id OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
+    ) else (
+        echo winget bulunamadi, resmi Node.js LTS indiriliyor...
+        powershell -NoProfile -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $list = Invoke-RestMethod 'https://nodejs.org/dist/index.json'; $lts = $list | Where-Object { $_.lts } | Select-Object -First 1; $arch = if ([Environment]::Is64BitOperatingSystem) { 'x64' } else { 'x86' }; $url = 'https://nodejs.org/dist/' + $lts.version + '/node-' + $lts.version + '-' + $arch + '.msi'; $out = Join-Path $env:TEMP 'nodejs-lts.msi'; Invoke-WebRequest -Uri $url -OutFile $out; Write-Output ('Indirildi: ' + $url)"
+        if exist "%TEMP%\nodejs-lts.msi" (
+            echo Node.js kuruluyor, lutfen bekleyin...
+            msiexec /i "%TEMP%\nodejs-lts.msi" /passive /norestart
+            del /f /q "%TEMP%\nodejs-lts.msi" >nul 2>&1
+        ) else (
+            echo HATA: Node.js indirilemedi. Lutfen https://nodejs.org adresinden manuel kurun.
+            pause
+            exit /b 1
+        )
     )
-    winget install -e --id OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
     if exist "%ProgramFiles%\nodejs\node.exe" (
         set "PATH=%ProgramFiles%\nodejs;%PATH%"
     )
@@ -54,15 +63,23 @@ if %errorlevel% neq 0 (
 
 where tailscale >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [2/4] Tailscale bulunamadi, winget ile kuruluyor...
+    echo [2/4] Tailscale bulunamadi, kuruluyor...
     where winget >nul 2>&1
-    if %errorlevel% equ 0 (
+    if !errorlevel! equ 0 (
         winget install -e --id Tailscale.Tailscale --accept-package-agreements --accept-source-agreements
-        if exist "%ProgramFiles%\Tailscale\tailscale.exe" (
-            set "PATH=%ProgramFiles%\Tailscale;%PATH%"
-        )
     ) else (
-        echo UYARI: winget bulunamadi. Tailscale'i https://tailscale.com/download/windows adresinden kurun.
+        echo winget bulunamadi, resmi Tailscale indiriliyor...
+        curl.exe -L -s -o "%TEMP%\tailscale-setup.exe" "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe"
+        if exist "%TEMP%\tailscale-setup.exe" (
+            echo Tailscale kurulumu baslatiliyor...
+            start /wait "" "%TEMP%\tailscale-setup.exe"
+            del /f /q "%TEMP%\tailscale-setup.exe" >nul 2>&1
+        ) else (
+            echo UYARI: Tailscale indirilemedi. https://tailscale.com/download/windows adresinden kurun.
+        )
+    )
+    if exist "%ProgramFiles%\Tailscale\tailscale.exe" (
+        set "PATH=%ProgramFiles%\Tailscale;%PATH%"
     )
 ) else (
     echo [2/4] Tailscale zaten kurulu.

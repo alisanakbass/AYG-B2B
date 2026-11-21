@@ -1,130 +1,32 @@
 @echo off
-setlocal enabledelayedexpansion
-
 cd /d "%~dp0"
-set "SERVER_DIR=%~dp0"
-if "%SERVER_DIR:~-1%"=="\" set "SERVER_DIR=%SERVER_DIR:~0,-1%"
 
 echo ==================================================
-echo    AYG B2B MOBIL SUNUCU - OTOMATIK KURULUM
+echo    AYG B2B MOBIL SUNUCU - KONTROL VE BASLATMA
 echo ==================================================
 echo.
-
-:: 1. Node.js kontrolu ve kurulumu
-where node >nul 2>&1
-if %errorlevel% neq 0 (
-    if exist "%ProgramFiles%\nodejs\node.exe" (
-        set "PATH=%ProgramFiles%\nodejs;%PATH%"
-    )
-)
 
 where node >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [1/4] Node.js bulunamadi, kuruluyor...
-    where winget >nul 2>&1
-    if !errorlevel! equ 0 (
-        winget install -e --id OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
-    ) else (
-        echo winget bulunamadi, resmi Node.js LTS indiriliyor...
-        powershell -NoProfile -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $list = Invoke-RestMethod 'https://nodejs.org/dist/index.json'; $lts = $list | Where-Object { $_.lts } | Select-Object -First 1; $arch = if ([Environment]::Is64BitOperatingSystem) { 'x64' } else { 'x86' }; $url = 'https://nodejs.org/dist/' + $lts.version + '/node-' + $lts.version + '-' + $arch + '.msi'; $out = Join-Path $env:TEMP 'nodejs-lts.msi'; Invoke-WebRequest -Uri $url -OutFile $out; Write-Output ('Indirildi: ' + $url)"
-        if exist "%TEMP%\nodejs-lts.msi" (
-            echo Node.js kuruluyor, lutfen bekleyin...
-            msiexec /i "%TEMP%\nodejs-lts.msi" /passive /norestart
-            del /f /q "%TEMP%\nodejs-lts.msi" >nul 2>&1
-        ) else (
-            echo HATA: Node.js indirilemedi. Lutfen https://nodejs.org adresinden manuel kurun.
-            pause
-            exit /b 1
-        )
-    )
-    if exist "%ProgramFiles%\nodejs\node.exe" (
-        set "PATH=%ProgramFiles%\nodejs;%PATH%"
-    )
-    where node >nul 2>&1
-    if %errorlevel% neq 0 (
-        echo UYARI: Node.js kuruldu ancak mevcut oturumda algilanamadi.
-        echo Lutfen bu pencereyi kapatip sunucu_kur.bat dosyasini tekrar calistirin.
-        pause
-        exit /b 1
-    )
-    echo Node.js kuruldu.
-) else (
-    echo [1/4] Node.js zaten kurulu.
+    echo [EKSIK] Node.js kurulu degil.
+    echo Lutfen https://nodejs.org adresinden Node.js LTS kurun.
+    echo.
+    pause
+    exit /b 1
 )
-echo.
-
-:: 2. Tailscale kontrolu ve kurulumu
-where tailscale >nul 2>&1
-if %errorlevel% neq 0 (
-    if exist "%ProgramFiles%\Tailscale\tailscale.exe" (
-        set "PATH=%ProgramFiles%\Tailscale;%PATH%"
-    )
-)
+echo [TAMAM] Node.js kurulu.
 
 where tailscale >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [2/4] Tailscale bulunamadi, kuruluyor...
-    where winget >nul 2>&1
-    if !errorlevel! equ 0 (
-        winget install -e --id Tailscale.Tailscale --accept-package-agreements --accept-source-agreements
-    ) else (
-        echo winget bulunamadi, resmi Tailscale indiriliyor...
-        curl.exe -L -s -o "%TEMP%\tailscale-setup.exe" "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe"
-        if exist "%TEMP%\tailscale-setup.exe" (
-            echo Tailscale kurulumu baslatiliyor...
-            start /wait "" "%TEMP%\tailscale-setup.exe"
-            del /f /q "%TEMP%\tailscale-setup.exe" >nul 2>&1
-        ) else (
-            echo UYARI: Tailscale indirilemedi. https://tailscale.com/download/windows adresinden kurun.
-        )
-    )
-    if exist "%ProgramFiles%\Tailscale\tailscale.exe" (
-        set "PATH=%ProgramFiles%\Tailscale;%PATH%"
-    )
+    echo [UYARI] Tailscale kurulu degil ^(uzaktan erisim icin: https://tailscale.com^).
 ) else (
-    echo [2/4] Tailscale zaten kurulu.
-)
-echo.
-
-:: 3. Windows Baslangic (Startup) kisayolu olusturma
-echo [3/4] Windows Baslangic kisayolu ayarlaniyor...
-powershell -NoProfile -Command "$startup = [Environment]::GetFolderPath('Startup'); $lnkPath = Join-Path $startup 'AYG_Mobil_Sunucu.lnk'; $ws = New-Object -ComObject WScript.Shell; $lnk = $ws.CreateShortcut($lnkPath); $lnk.TargetPath = '%SERVER_DIR%\gizli_baslat.vbs'; $lnk.WorkingDirectory = '%SERVER_DIR%'; $lnk.WindowStyle = 1; $lnk.Save()"
-if %errorlevel% equ 0 (
-    echo Baslangic kisayolu olusturuldu.
-) else (
-    echo UYARI: Baslangic kisayolu olusturulamadi.
-)
-echo.
-
-:: 4. Sunucuyu arka planda (sistem tepsisinde) baslatma
-echo [4/4] AYG Mobil Sunucu sistem tepsisinde baslatiliyor...
-wscript.exe "%SERVER_DIR%\gizli_baslat.vbs"
-echo.
-
-:: 5. Tailscale Serve ayari
-where tailscale >nul 2>&1
-if %errorlevel% equ 0 (
-    tailscale status >nul 2>&1
-    if !errorlevel! equ 0 (
-        echo Tailscale bagli. Port 3456 HTTPS yayini ayarlaniyor...
-        tailscale serve --bg 3456
-        echo.
-        tailscale serve status
-    ) else (
-        echo ==================================================
-        echo ONEMLI SON ADIM:
-        echo Sag alt kosedeki Tailscale simgesinden Google hesabinizla
-        echo giris yapin, ardindan sunucu_kur.bat dosyasini bir kez
-        echo daha calistirin ^(veya 'tailscale serve --bg 3456' yazin^).
-        echo ==================================================
-    )
+    echo [TAMAM] Tailscale kurulu.
+    tailscale serve --bg 3456 >nul 2>&1
 )
 
 echo.
-echo ==================================================
-echo    KURULUM TAMAMLANDI!
-echo    Sunucu arka planda calisiyor (Port 3456).
-echo    Sag alttaki gizli simgelerde mavi 'A' ikonunu gorebilirsiniz.
-echo ==================================================
+echo Otomatik baslatma icin: Win+R -^> shell:startup klasorune
+echo baslat.bat veya gizli_baslat.vbs kisayolunu koyabilirsiniz.
 echo.
-pause
+echo Sunucu baslatiliyor...
+call "%~dp0baslat.bat"

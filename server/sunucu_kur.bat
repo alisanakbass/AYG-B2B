@@ -28,5 +28,6 @@ echo.
 echo Otomatik baslatma icin: Win+R -^> shell:startup klasorune
 echo baslat.bat veya gizli_baslat.vbs kisayolunu koyabilirsiniz.
 echo.
-echo Sunucu baslatiliyor...
-call "%~dp0baslat.bat"
+echo Sunucu sistem tepsisinde (sag alt 'A' ikonu) baslatiliyor...
+start "" "%~dp0gizli_baslat.vbs"
+timeout /t 2 >nul
